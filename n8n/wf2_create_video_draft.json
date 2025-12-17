@@ -1,0 +1,361 @@
+{
+  "name": "WF2 - Create Video Draft",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "approve-script",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "approve-script"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "supabaseUrl",
+              "value": "={{$env.SUPABASE_URL}}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "supabaseServiceKey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "heygenApiKey",
+              "value": "={{$env.HEYGEN_API_KEY}}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "heygenAvatarId",
+              "value": "={{$env.HEYGEN_AVATAR_ID}}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "scriptId",
+              "value": "={{ $json.body.script_id }}",
+              "type": "string"
+            },
+            {
+              "id": "id-6",
+              "name": "requestedByUserId",
+              "value": "={{ $json.body.requested_by_user_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "workflow-config",
+      "name": "Workflow Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $json.supabaseUrl }}/rest/v1/scripts?id=eq.{{ $json.scriptId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"Script Approved\"\n}",
+        "options": {}
+      },
+      "id": "update-status-approved",
+      "name": "Update Status to Script Approved",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Workflow Configuration').first().json.supabaseUrl }}/rest/v1/scripts?id=eq.{{ $('Workflow Configuration').first().json.scriptId }}&select=*",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-script",
+      "name": "Fetch Script Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.heygen.com/v2/video/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $('Workflow Configuration').first().json.heygenApiKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"video_inputs\": [{\n    \"character\": {\n      \"type\": \"avatar\",\n      \"avatar_id\": \"{{ $('Workflow Configuration').first().json.heygenAvatarId }}\"\n    },\n    \"voice\": {\n      \"type\": \"text\",\n      \"input_text\": \"{{ $json[0].script_json.spoken_script }}\"\n    }\n  }],\n  \"dimension\": {\n    \"width\": 1080,\n    \"height\": 1920\n  }\n}",
+        "options": {}
+      },
+      "id": "create-heygen-video",
+      "name": "Create HeyGen Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "id": "wait-30-seconds",
+      "name": "Wait 30 Seconds",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1100, 0]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.heygen.com/v1/video_status.get?video_id={{ $('Create HeyGen Video').first().json.data.video_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $('Workflow Configuration').first().json.heygenApiKey }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check-heygen-status",
+      "name": "Check HeyGen Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1320, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-1",
+              "leftValue": "={{ $json.data.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-video-complete",
+      "name": "IF Video Complete",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1540, 0]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Workflow Configuration').first().json.supabaseUrl }}/rest/v1/scripts?id=eq.{{ $('Workflow Configuration').first().json.scriptId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"Video Ready (Preview)\",\n  \"video_url\": \"{{ $('Check HeyGen Status').first().json.data.video_url }}\"\n}",
+        "options": {}
+      },
+      "id": "update-supabase-success",
+      "name": "Update Supabase Success",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1760, -100]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Workflow Configuration').first().json.supabaseUrl }}/rest/v1/scripts?id=eq.{{ $('Workflow Configuration').first().json.scriptId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"Failed\",\n  \"error_message\": \"HeyGen video generation failed: {{ $('Check HeyGen Status').first().json.data.error || 'Unknown error' }}\"\n}",
+        "options": {}
+      },
+      "id": "update-supabase-failed",
+      "name": "Update Supabase Failed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1760, 100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, script_id: $('Workflow Configuration').first().json.scriptId, status: 'Video Ready (Preview)' } }}",
+        "options": {}
+      },
+      "id": "respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1980, -100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, script_id: $('Workflow Configuration').first().json.scriptId, status: 'Failed', error: $('Check HeyGen Status').first().json.data.error || 'Unknown error' } }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "respond-failed",
+      "name": "Respond Failed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1980, 100]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [[{"node": "Workflow Configuration", "type": "main", "index": 0}]]
+    },
+    "Workflow Configuration": {
+      "main": [[{"node": "Update Status to Script Approved", "type": "main", "index": 0}]]
+    },
+    "Update Status to Script Approved": {
+      "main": [[{"node": "Fetch Script Data", "type": "main", "index": 0}]]
+    },
+    "Fetch Script Data": {
+      "main": [[{"node": "Create HeyGen Video", "type": "main", "index": 0}]]
+    },
+    "Create HeyGen Video": {
+      "main": [[{"node": "Wait 30 Seconds", "type": "main", "index": 0}]]
+    },
+    "Wait 30 Seconds": {
+      "main": [[{"node": "Check HeyGen Status", "type": "main", "index": 0}]]
+    },
+    "Check HeyGen Status": {
+      "main": [[{"node": "IF Video Complete", "type": "main", "index": 0}]]
+    },
+    "IF Video Complete": {
+      "main": [
+        [{"node": "Update Supabase Success", "type": "main", "index": 0}],
+        [{"node": "Update Supabase Failed", "type": "main", "index": 0}]
+      ]
+    },
+    "Update Supabase Success": {
+      "main": [[{"node": "Respond Success", "type": "main", "index": 0}]]
+    },
+    "Update Supabase Failed": {
+      "main": [[{"node": "Respond Failed", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "wf2-v1",
+  "meta": {
+    "instanceId": "viral-video-app"
+  },
+  "id": "wf2_create_video_draft",
+  "tags": ["viral-video-app", "video-generation"]
+}

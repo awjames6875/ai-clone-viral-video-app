@@ -1,0 +1,327 @@
+{
+  "name": "WF1 - Daily Script Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Daily TikTok Scraper Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "tiktokNiche",
+              "value": "={{$env.TIKTOK_NICHE}}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "tiktokScraperApiUrl",
+              "value": "={{$env.TIKTOK_SCRAPER_API_URL}}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "heygenApiKey",
+              "value": "={{$env.HEYGEN_API_KEY}}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "heygenAvatarId",
+              "value": "={{$env.HEYGEN_AVATAR_ID}}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "supabaseUrl",
+              "value": "={{$env.SUPABASE_URL}}",
+              "type": "string"
+            },
+            {
+              "id": "id-6",
+              "name": "supabaseServiceKey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "workflow-config",
+      "name": "Workflow Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Workflow Configuration').first().json.tiktokScraperApiUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "niche",
+              "value": "={{ $('Workflow Configuration').first().json.tiktokNiche }}"
+            },
+            {
+              "name": "count",
+              "value": "10"
+            },
+            {
+              "name": "sort",
+              "value": "viral"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "scrape-tiktok",
+      "name": "Scrape TikTok Viral Videos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "videoUrl",
+              "value": "={{ $json.videoUrl }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "videoDescription",
+              "value": "={{ $json.description }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "videoViews",
+              "value": "={{ $json.viewCount }}",
+              "type": "number"
+            },
+            {
+              "id": "id-4",
+              "name": "videoLikes",
+              "value": "={{ $json.likeCount }}",
+              "type": "number"
+            },
+            {
+              "id": "id-5",
+              "name": "sourceHash",
+              "value": "={{ $json.videoId || $json.videoUrl.split('/').pop() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "extract-data",
+      "name": "Extract Video Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "models/gemini-1.5-pro"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ 'Analyze this viral TikTok video and provide detailed insights:\\n\\nVideo URL: ' + $json.videoUrl + '\\nDescription: ' + $json.videoDescription + '\\nViews: ' + $json.videoViews + '\\nLikes: ' + $json.videoLikes + '\\n\\nProvide a JSON response with these fields:\\n- hook: The opening hook used in the first 3 seconds\\n- videoStructure: How the video is structured and paced\\n- contentStyle: The tone, energy, and presentation style\\n- keyElements: What makes this video successful and viral\\n- targetAudience: Who this content resonates with' }}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {}
+      },
+      "id": "analyze-gemini",
+      "name": "Analyze Video with Gemini",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "models/gemini-1.5-pro"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ 'Based on this video analysis, create a compelling 30-60 second script for ' + $('Workflow Configuration').first().json.tiktokNiche + ' niche:\\n\\nAnalysis: ' + JSON.stringify($json) + '\\n\\nCreate a JSON response with these exact fields:\\n- spoken_script: The full script text to be spoken by the avatar\\n- caption: A catchy caption for the post (max 150 chars)\\n- hashtags: Array of 5-10 relevant hashtags without # symbol\\n- on_screen_text: Array of text overlays to show during the video\\n- music_track: Suggested music style or track name\\n- hook: The opening hook line (first 3 seconds)\\n\\nMake sure the script:\\n1. Uses a similar hook strategy to grab attention immediately\\n2. Follows a proven structure that keeps viewers engaged\\n3. Matches the successful content style and tone\\n4. Is 30-60 seconds when spoken at normal pace' }}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {}
+      },
+      "id": "generate-script",
+      "name": "Generate Script with Gemini",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [1100, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "script_json",
+              "value": "={{ $json }}",
+              "type": "object"
+            },
+            {
+              "id": "id-2",
+              "name": "analysis_json",
+              "value": "={{ $('Analyze Video with Gemini').first().json }}",
+              "type": "object"
+            },
+            {
+              "id": "id-3",
+              "name": "source_video_url",
+              "value": "={{ $('Extract Video Data').first().json.videoUrl }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "source_hash",
+              "value": "={{ $('Extract Video Data').first().json.sourceHash }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "caption",
+              "value": "={{ $json.caption }}",
+              "type": "string"
+            },
+            {
+              "id": "id-6",
+              "name": "hashtags",
+              "value": "={{ $json.hashtags }}",
+              "type": "object"
+            },
+            {
+              "id": "id-7",
+              "name": "music_track",
+              "value": "={{ $json.music_track }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "prepare-insert",
+      "name": "Prepare Script Data for Insert",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1320, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Workflow Configuration').first().json.supabaseUrl }}/rest/v1/scripts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"Pending Script\",\n  \"processed\": false,\n  \"source_video_url\": \"{{ $json.source_video_url }}\",\n  \"source_hash\": \"{{ $json.source_hash }}\",\n  \"analysis_json\": {{ JSON.stringify($json.analysis_json) }},\n  \"script_json\": {{ JSON.stringify($json.script_json) }},\n  \"caption\": \"{{ $json.caption }}\",\n  \"hashtags\": {{ JSON.stringify($json.hashtags) }},\n  \"music_track\": \"{{ $json.music_track }}\"\n}",
+        "options": {}
+      },
+      "id": "insert-supabase",
+      "name": "Insert Script to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1540, 0]
+    }
+  ],
+  "connections": {
+    "Daily TikTok Scraper Schedule": {
+      "main": [[{"node": "Workflow Configuration", "type": "main", "index": 0}]]
+    },
+    "Workflow Configuration": {
+      "main": [[{"node": "Scrape TikTok Viral Videos", "type": "main", "index": 0}]]
+    },
+    "Scrape TikTok Viral Videos": {
+      "main": [[{"node": "Extract Video Data", "type": "main", "index": 0}]]
+    },
+    "Extract Video Data": {
+      "main": [[{"node": "Analyze Video with Gemini", "type": "main", "index": 0}]]
+    },
+    "Analyze Video with Gemini": {
+      "main": [[{"node": "Generate Script with Gemini", "type": "main", "index": 0}]]
+    },
+    "Generate Script with Gemini": {
+      "main": [[{"node": "Prepare Script Data for Insert", "type": "main", "index": 0}]]
+    },
+    "Prepare Script Data for Insert": {
+      "main": [[{"node": "Insert Script to Supabase", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "wf1-v1",
+  "meta": {
+    "instanceId": "viral-video-app"
+  },
+  "id": "wf1_daily_script_generator",
+  "tags": ["viral-video-app", "script-generation"]
+}

@@ -1,0 +1,278 @@
+{
+  "name": "WF3 - Post Video Manual",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "post-video",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "post-video"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "supabaseUrl",
+              "value": "={{$env.SUPABASE_URL}}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "supabaseServiceKey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "blotatoApiKey",
+              "value": "={{$env.BLOTATO_API_KEY}}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "scriptId",
+              "value": "={{ $json.body.script_id }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "requestedByUserId",
+              "value": "={{ $json.body.requested_by_user_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "workflow-config",
+      "name": "Workflow Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.supabaseUrl }}/rest/v1/scripts?id=eq.{{ $json.scriptId }}&select=*",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.supabaseServiceKey }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-script",
+      "name": "Fetch Script Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-1",
+              "leftValue": "={{ $json[0].status }}",
+              "rightValue": "Video Ready (Preview)",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "condition-2",
+              "leftValue": "={{ $json[0].processed }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-valid-status",
+      "name": "IF Valid Status",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Fetch Script Data').first().json[0].video_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "video"
+            }
+          }
+        }
+      },
+      "id": "download-video",
+      "name": "Download Video Binary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [880, -100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.blotato.com/v1/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Workflow Configuration').first().json.blotatoApiKey }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "video",
+              "inputDataFieldName": "video"
+            },
+            {
+              "name": "caption",
+              "value": "={{ $('Fetch Script Data').first().json[0].caption }} {{ $('Fetch Script Data').first().json[0].hashtags.map(h => '#' + h).join(' ') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "post-to-blotato",
+      "name": "Post to Blotato",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1100, -100]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Workflow Configuration').first().json.supabaseUrl }}/rest/v1/scripts?id=eq.{{ $('Workflow Configuration').first().json.scriptId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"Posted\",\n  \"processed\": true\n}",
+        "options": {}
+      },
+      "id": "update-supabase-success",
+      "name": "Update Supabase Success",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1320, -100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, script_id: $('Workflow Configuration').first().json.scriptId, status: 'Posted' } }}",
+        "options": {}
+      },
+      "id": "respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1540, -100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, script_id: $('Workflow Configuration').first().json.scriptId, error: 'Invalid status or already processed. Status must be \"Video Ready (Preview)\" and processed must be false.' } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "respond-invalid-status",
+      "name": "Respond Invalid Status",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [880, 100]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [[{"node": "Workflow Configuration", "type": "main", "index": 0}]]
+    },
+    "Workflow Configuration": {
+      "main": [[{"node": "Fetch Script Data", "type": "main", "index": 0}]]
+    },
+    "Fetch Script Data": {
+      "main": [[{"node": "IF Valid Status", "type": "main", "index": 0}]]
+    },
+    "IF Valid Status": {
+      "main": [
+        [{"node": "Download Video Binary", "type": "main", "index": 0}],
+        [{"node": "Respond Invalid Status", "type": "main", "index": 0}]
+      ]
+    },
+    "Download Video Binary": {
+      "main": [[{"node": "Post to Blotato", "type": "main", "index": 0}]]
+    },
+    "Post to Blotato": {
+      "main": [[{"node": "Update Supabase Success", "type": "main", "index": 0}]]
+    },
+    "Update Supabase Success": {
+      "main": [[{"node": "Respond Success", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "wf3-v1",
+  "meta": {
+    "instanceId": "viral-video-app"
+  },
+  "id": "wf3_post_video_manual",
+  "tags": ["viral-video-app", "video-posting"]
+}
