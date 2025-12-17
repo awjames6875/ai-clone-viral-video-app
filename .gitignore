@@ -1,4 +1,5 @@
 nul
 node_modules
 .env
+.env.local
 .mcp.json
