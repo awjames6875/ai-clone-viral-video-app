@@ -2,3 +2,16 @@ nul
 node_modules
 .env
 .mcp.json
+
+# Next.js
+.next/
+out/
+build/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
