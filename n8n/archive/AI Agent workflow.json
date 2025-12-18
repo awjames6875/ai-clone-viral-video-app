@@ -1,0 +1,569 @@
+{
+  "name": "AI Agent workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "67c3f659-fb93-4627-956b-880e19f2d921",
+      "name": "Daily TikTok Scraper Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        2448,
+        2704
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "tiktokNiche",
+              "value": "<__PLACEHOLDER_VALUE__Your TikTok niche (e.g., fitness, cooking, tech)__>",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "tiktokScraperApiUrl",
+              "value": "<__PLACEHOLDER_VALUE__TikTok scraper API endpoint URL__>",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "heygenApiKey",
+              "value": "<__PLACEHOLDER_VALUE__Your Heygen API key__>",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "heygenAvatarId",
+              "value": "<__PLACEHOLDER_VALUE__Your Heygen avatar ID__>",
+              "type": "string"
+            },
+            {
+              "id": "id-7",
+              "name": "blotatoApiKey",
+              "value": "<__PLACEHOLDER_VALUE__Your Blotato API key__>",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "b064a5d8-328f-4dbf-8252-55f30ea5f34b",
+      "name": "Workflow Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2672,
+        2704
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Workflow Configuration').first().json.tiktokScraperApiUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "niche",
+              "value": "={{ $('Workflow Configuration').first().json.niche }}"
+            },
+            {
+              "name": "count",
+              "value": "10"
+            },
+            {
+              "name": "sort",
+              "value": "viral"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "eda5fd33-fb63-4b26-a17f-6e5add62834d",
+      "name": "Scrape TikTok Viral Videos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2896,
+        2704
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "videoUrl",
+              "value": "={{ $('Scrape TikTok Viral Videos').item.json.videoUrl }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "videoDescription",
+              "value": "={{ $('Scrape TikTok Viral Videos').item.json.description }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "videoViews",
+              "value": "={{ $('Scrape TikTok Viral Videos').item.json.viewCount }}",
+              "type": "number"
+            },
+            {
+              "id": "id-4",
+              "name": "videoLikes",
+              "value": "={{ $('Scrape TikTok Viral Videos').item.json.likeCount }}",
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "a5ab35d2-baf2-40c1-bd93-2c759a89e681",
+      "name": "Extract Video Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3120,
+        2704
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "models/gemini-1.5-pro"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ 'Analyze this viral TikTok video and provide detailed insights:\\n\\nVideo URL: ' + $json.videoUrl + '\\nDescription: ' + $json.videoDescription + '\\nViews: ' + $json.videoViews + '\\nLikes: ' + $json.videoLikes + '\\n\\nProvide a JSON response with these fields:\\n- hook: The opening hook used in the first 3 seconds\\n- videoStructure: How the video is structured and paced\\n- contentStyle: The tone, energy, and presentation style\\n- keyElements: What makes this video successful and viral\\n- targetAudience: Who this content resonates with' }}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "1285a871-cfaa-4253-8101-bc1c97879ff8",
+      "name": "Analyze Video with Gemini",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        3344,
+        2704
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "models/gemini-1.5-pro"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ 'Based on this video analysis, create a compelling 30-60 second script for ' + $('Workflow Configuration').first().json.tiktokNiche + ' niche:\\n\\nAnalysis: ' + JSON.stringify($json) + '\\n\\nCreate a script that:\\n1. Uses a similar hook strategy to grab attention immediately\\n2. Follows a proven structure that keeps viewers engaged\\n3. Matches the successful content style and tone\\n4. Incorporates the key viral elements\\n5. Speaks directly to the target audience\\n6. Builds brand awareness\\n\\nInclude specific directions for visuals and delivery.' }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "d8b91f96-6bcb-4a26-83c3-68e718c57068",
+      "name": "Generate Script with Gemini",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        3696,
+        2704
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.heygen.com/v2/video/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $('Workflow Configuration').first().json.heygenApiKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "avatar_id",
+              "value": "={{ $('Workflow Configuration').first().json.avatarId }}"
+            },
+            {
+              "name": "script",
+              "value": "={{ $json.approvedScript || $json.Script }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b4548fe9-6fc2-42d3-b609-b33841548d43",
+      "name": "Create Video with Heygen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2896,
+        2480
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://api.heygen.com/v1/video_status.get?video_id=' + $json.video_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $('Workflow Configuration').first().json.heygenApiKey }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b1f188e1-6173-4a60-8be6-d7d316c2e6fd",
+      "name": "Check Heygen Video Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3120,
+        2480
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.video_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "video"
+            }
+          }
+        }
+      },
+      "id": "875c1d70-0c08-4b95-8392-20e5433b4bb3",
+      "name": "Download Heygen Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3344,
+        2480
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.blotato.com/v1/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Workflow Configuration').first().json.blotatoApiKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "multipart/form-data"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "video",
+              "inputDataFieldName": "video"
+            },
+            {
+              "name": "caption",
+              "value": "={{ $('Generate Script with Gemini').first().json.text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b6dacb08-b5b7-456c-b1e6-d52ceccf05df",
+      "name": "Post to All Platforms via Blotato",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3568,
+        2480
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<__PLACEHOLDER_VALUE__Your Google Sheets document ID__>"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Scripts for Approval"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Script": "={{ $('Generate Script with Gemini').first().json.text }}",
+            "Video URL": "={{ $('Extract Video Data').first().json.videoUrl }}",
+            "Status": "Pending",
+            "Created Date": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "fd5982ed-e5bb-4197-8d69-d29678eee25d",
+      "name": "Save Script to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        4048,
+        2704
+      ]
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<__PLACEHOLDER_VALUE__Your Google Sheets document ID__>"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Scripts for Approval"
+        },
+        "event": "rowUpdate",
+        "options": {
+          "columnsToWatch": [
+            "Status"
+          ]
+        }
+      },
+      "id": "8adc35a4-ebdc-4b8e-98a0-382affeec0df",
+      "name": "Approval Trigger - Watch for Approved Scripts",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        2448,
+        2480
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "approvedScript",
+              "value": "={{ $json.script }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "videoUrl",
+              "value": "={{ $json.videoUrl }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "91447f3c-bc1a-4ad8-8995-5978b683f5db",
+      "name": "Prepare Approved Script Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2672,
+        2480
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily TikTok Scraper Schedule": {
+      "main": [
+        [
+          {
+            "node": "Workflow Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Configuration": {
+      "main": [
+        [
+          {
+            "node": "Scrape TikTok Viral Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrape TikTok Viral Videos": {
+      "main": [
+        [
+          {
+            "node": "Extract Video Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Video Data": {
+      "main": [
+        [
+          {
+            "node": "Analyze Video with Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Video with Gemini": {
+      "main": [
+        [
+          {
+            "node": "Generate Script with Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Video with Heygen": {
+      "main": [
+        [
+          {
+            "node": "Check Heygen Video Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Heygen Video Status": {
+      "main": [
+        [
+          {
+            "node": "Download Heygen Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Heygen Video": {
+      "main": [
+        [
+          {
+            "node": "Post to All Platforms via Blotato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Script with Gemini": {
+      "main": [
+        [
+          {
+            "node": "Save Script to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approval Trigger - Watch for Approved Scripts": {
+      "main": [
+        [
+          {
+            "node": "Prepare Approved Script Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Approved Script Data": {
+      "main": [
+        [
+          {
+            "node": "Create Video with Heygen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "availableInMCP": false
+  },
+  "versionId": "3a9f31b8-1202-41e0-87f7-7777fb6267c6",
+  "meta": {
+    "templateId": "ready-to-run-ai-workflow",
+    "instanceId": "a66d3be2bbe793cfd917c94bf7a7e1dd020acd649dec0d7b47b308be8157fe36"
+  },
+  "id": "63MkkL4aWqwBdGgX",
+  "tags": []
+}
