@@ -49,7 +49,7 @@ Build a premium mobile-first Next.js dashboard that integrates with n8n workflow
   - Row Level Security policies
   - User-based access control
 
-- [x] **2.3** Create `/lib/supabase.ts`
+- [x] **2.3** Create `/src/lib/supabase.ts`
   - Typed Supabase client
   - Type definitions for scripts table
 
@@ -58,7 +58,7 @@ Build a premium mobile-first Next.js dashboard that integrates with n8n workflow
 ## Phase 3: Next.js Project Setup
 
 ### Tasks:
-- [ ] **3.1** Initialize Next.js App Router project
+- [x] **3.1** Initialize Next.js App Router project
   - TypeScript configuration
   - Tailwind CSS setup
   - shadcn/ui installation
@@ -70,9 +70,9 @@ Build a premium mobile-first Next.js dashboard that integrates with n8n workflow
   - N8N_BASE_URL
   - N8N_WEBHOOK_SECRET
 
-- [ ] **3.3** Setup Framer Motion
+- [x] **3.3** Setup Framer Motion
   - Install dependencies
-  - Create animation variants
+  - Create animation variants in `/src/lib/animations.ts`
 
 ---
 
@@ -210,7 +210,7 @@ Build a premium mobile-first Next.js dashboard that integrates with n8n workflow
 
 ## Review Section
 
-### Completed (Phases 1-2)
+### Completed (Phases 1-3)
 - **Phase 1**: All 3 n8n workflow files created in `/n8n/`
   - `wf1_daily_script_generator.json` - Scrapes TikTok, generates scripts, stores in Supabase
   - `wf2_create_video_draft.json` - Creates HeyGen videos from approved scripts
@@ -218,11 +218,14 @@ Build a premium mobile-first Next.js dashboard that integrates with n8n workflow
   - Legacy `AI Agent workflow.json` moved to `/n8n/archive/` (used Google Sheets)
 - **Phase 2**: Database layer complete
   - Supabase schema and RLS policies in `/supabase/`
-  - Typed Supabase client in `/lib/supabase.ts`
-- **Phase 3.2**: `.env.example` created
+  - Typed Supabase client in `/src/lib/supabase.ts`
+- **Phase 3**: Next.js project setup complete
+  - Next.js 14 with App Router, TypeScript, Tailwind CSS
+  - shadcn/ui configured with CSS variables
+  - Framer Motion with animation variants in `/src/lib/animations.ts`
+  - Project structure: `/src/app/`, `/src/components/`, `/src/lib/`
 
-### Remaining Work (Phases 3-8)
-- **Phase 3**: Next.js project initialization (not started)
+### Remaining Work (Phases 4-8)
 - **Phase 4**: API routes for script approval and video posting
 - **Phase 5**: UI pages (login, dashboard, script editor, video preview)
 - **Phase 6**: Shared UI components
@@ -231,4 +234,4 @@ Build a premium mobile-first Next.js dashboard that integrates with n8n workflow
 
 ---
 
-**NEXT STEP: Initialize Next.js App Router project (Phase 3.1)**
+**NEXT STEP: Create API routes (Phase 4)**
