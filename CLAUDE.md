@@ -17,7 +17,9 @@ TikTok Scrape → Gemini Analysis → Script Generation → Supabase Storage →
 
 1. **n8n Workflows** (`/n8n/`)
    - `wf1_daily_script_generator.json` - Daily scraping and script generation, stores to Supabase
-   - `AI Agent workflow.json` - Full pipeline with Google Sheets (legacy, being replaced with Supabase)
+   - `wf2_create_video_draft.json` - Creates HeyGen videos from approved scripts
+   - `wf3_post_video_manual.json` - Posts videos via Blotato
+   - `/n8n/archive/` - Contains legacy workflows (Google Sheets-based)
 
 2. **Data Flow**
    - Scripts stored in Supabase `scripts` table
