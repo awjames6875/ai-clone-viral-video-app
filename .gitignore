@@ -1,4 +1,27 @@
-nul
+# Dependencies
 node_modules
+.pnp
+.pnp.js
+
+# Next.js
+.next
+out
+
+# Environment
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Debug
+npm-debug.log*
+
+# Misc
+.DS_Store
+*.pem
 .mcp.json
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts

@@ -45,25 +45,53 @@ export interface Script {
   updated_at: string;
 }
 
+// Script update fields
+export type ScriptUpdate = {
+  status?: ScriptStatus;
+  processed?: boolean;
+  source_video_url?: string | null;
+  source_hash?: string | null;
+  analysis_json?: AnalysisJson | null;
+  script_json?: ScriptJson | null;
+  caption?: string | null;
+  hashtags?: string[] | null;
+  music_track?: string | null;
+  video_url?: string | null;
+  error_message?: string | null;
+};
+
 // Database types for Supabase
-export interface Database {
+export type Database = {
   public: {
     Tables: {
       scripts: {
         Row: Script;
         Insert: Partial<Script> & { user_id?: string };
-        Update: Partial<Script>;
+        Update: ScriptUpdate;
+        Relationships: [];
       };
     };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      [_ in never]: never;
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
   };
-}
+};
 
 // Browser client (uses anon key, respects RLS)
 export function createClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-  return createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey);
+  return createSupabaseClient(supabaseUrl, supabaseAnonKey);
 }
 
 // Server client (uses service role key, bypasses RLS)
@@ -71,7 +99,7 @@ export function createServiceClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-  return createSupabaseClient<Database>(supabaseUrl, supabaseServiceKey, {
+  return createSupabaseClient(supabaseUrl, supabaseServiceKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
