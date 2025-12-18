@@ -203,7 +203,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"status\": \"Posted\",\n  \"processed\": true\n}",
+        "jsonBody": "={\n  \"status\": \"Posted\",\n  \"processed\": true,\n  \"posted_at\": \"{{ $now.toISO() }}\",\n  \"platforms\": {{ JSON.stringify($('Post to Blotato').first().json.platforms || ['blotato']) }},\n  \"post_ids\": {{ JSON.stringify($('Post to Blotato').first().json) }}\n}",
         "options": {}
       },
       "id": "update-supabase-success",

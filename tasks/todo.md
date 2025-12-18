@@ -209,7 +209,36 @@ Build a premium mobile-first Next.js dashboard that integrates with n8n workflow
 ```
 
 ## Review Section
-_To be filled after implementation_
+
+### 2025-12-17: Performance Tracking Enhancement
+
+**Summary:** Added performance tracking to measure how repurposed viral content performs vs. the original source video.
+
+**Changes Made:**
+
+1. **Database Migration** (`add_performance_tracking`)
+   - Added 5 new columns to `scripts` table:
+     - `source_metrics` (JSONB) - Original viral video stats (views, likes, captured_at)
+     - `posted_at` (TIMESTAMPTZ) - When content was posted
+     - `platforms` (TEXT[]) - Array of platforms posted to
+     - `post_ids` (JSONB) - Post IDs from Blotato response
+     - `our_metrics` (JSONB) - Our content's performance (manual entry initially)
+   - Added index on `posted_at` for efficient querying
+
+2. **WF1 Update** (`n8n/wf1_daily_script_generator.json`)
+   - Modified "Insert Script to Supabase" node
+   - Now captures `source_metrics` with views/likes from the scraped TikTok video
+
+3. **WF3 Update** (`n8n/wf3_post_video_manual.json`)
+   - Modified "Update Supabase Success" node
+   - Now captures `posted_at`, `platforms`, and `post_ids` from Blotato response
+
+**Impact:** Minimal - ~15 lines of SQL, ~10 lines of JSON changes
+
+**Future Work:**
+- Add UI for manual `our_metrics` entry
+- Create WF4 for automated metrics polling (if Blotato API supports it)
+- Build dashboard to compare source vs. our performance
 
 ---
 

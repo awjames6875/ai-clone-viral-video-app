@@ -281,7 +281,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"status\": \"Pending Script\",\n  \"processed\": false,\n  \"source_video_url\": \"{{ $json.source_video_url }}\",\n  \"source_hash\": \"{{ $json.source_hash }}\",\n  \"analysis_json\": {{ JSON.stringify($json.analysis_json) }},\n  \"script_json\": {{ JSON.stringify($json.script_json) }},\n  \"caption\": \"{{ $json.caption }}\",\n  \"hashtags\": {{ JSON.stringify($json.hashtags) }},\n  \"music_track\": \"{{ $json.music_track }}\"\n}",
+        "jsonBody": "={\n  \"status\": \"Pending Script\",\n  \"processed\": false,\n  \"source_video_url\": \"{{ $json.source_video_url }}\",\n  \"source_hash\": \"{{ $json.source_hash }}\",\n  \"analysis_json\": {{ JSON.stringify($json.analysis_json) }},\n  \"script_json\": {{ JSON.stringify($json.script_json) }},\n  \"caption\": \"{{ $json.caption }}\",\n  \"hashtags\": {{ JSON.stringify($json.hashtags) }},\n  \"music_track\": \"{{ $json.music_track }}\",\n  \"source_metrics\": { \"views\": {{ $('Extract Video Data').first().json.videoViews }}, \"likes\": {{ $('Extract Video Data').first().json.videoLikes }}, \"captured_at\": \"{{ $now.toISO() }}\" }\n}",
         "options": {}
       },
       "id": "insert-supabase",
