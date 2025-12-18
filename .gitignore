@@ -1,6 +1,8 @@
 nul
 node_modules
 .env
+.env.local
+.env*.local
 .mcp.json
 
 # Next.js
