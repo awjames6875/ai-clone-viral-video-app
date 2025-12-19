@@ -12,13 +12,18 @@ import {
   Check,
   AlertCircle,
   Play,
+  Download,
+  ChevronDown,
+  ChevronUp,
+  BarChart3,
 } from "lucide-react";
 import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { HashtagInput } from "@/components/hashtag-input";
-import { createBrowserClient, type Script } from "@/lib/supabase";
+import { useToast } from "@/components/ui/toast";
+import { createBrowserClient, type Script, type OurMetrics } from "@/lib/supabase";
 import { formatRelativeTime, formatHashtags } from "@/lib/utils";
 
 interface PageProps {
@@ -28,6 +33,7 @@ interface PageProps {
 export default function VideoPreviewPage({ params }: PageProps) {
   const { id } = use(params);
   const router = useRouter();
+  const { showToast } = useToast();
   const [script, setScript] = useState<Script | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isPosting, setIsPosting] = useState(false);
@@ -39,6 +45,16 @@ export default function VideoPreviewPage({ params }: PageProps) {
   // Form state
   const [caption, setCaption] = useState("");
   const [hashtags, setHashtags] = useState<string[]>([]);
+
+  // Metrics state
+  const [metricsOpen, setMetricsOpen] = useState(false);
+  const [isSavingMetrics, setIsSavingMetrics] = useState(false);
+  const [metrics, setMetrics] = useState<Partial<OurMetrics>>({
+    views: 0,
+    likes: 0,
+    comments: 0,
+    shares: 0,
+  });
 
   // Lazy init supabase
   const supabaseRef = useRef<ReturnType<typeof createBrowserClient> | null>(null);
@@ -73,6 +89,9 @@ export default function VideoPreviewPage({ params }: PageProps) {
       setScript(scriptData);
       setCaption(scriptData.caption || scriptData.script_json?.caption || "");
       setHashtags(scriptData.hashtags || scriptData.script_json?.hashtags || []);
+      if (scriptData.our_metrics) {
+        setMetrics(scriptData.our_metrics);
+      }
       setIsLoading(false);
     };
 
@@ -84,12 +103,43 @@ export default function VideoPreviewPage({ params }: PageProps) {
     setIsSaving(true);
     const supabase = getSupabase();
 
-    await supabase
+    const { error } = await supabase
       .from("scripts")
       .update({ caption, hashtags })
       .eq("id", id);
 
     setIsSaving(false);
+    if (error) {
+      showToast("Failed to save changes", "error");
+    } else {
+      showToast("Changes saved");
+    }
+  };
+
+  const handleSaveMetrics = async () => {
+    if (!script) return;
+    setIsSavingMetrics(true);
+    const supabase = getSupabase();
+
+    const our_metrics: OurMetrics = {
+      views: metrics.views || 0,
+      likes: metrics.likes || 0,
+      comments: metrics.comments || 0,
+      shares: metrics.shares || 0,
+      captured_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase
+      .from("scripts")
+      .update({ our_metrics })
+      .eq("id", id);
+
+    setIsSavingMetrics(false);
+    if (error) {
+      showToast("Failed to save metrics", "error");
+    } else {
+      showToast("Metrics saved");
+    }
   };
 
   const handlePost = async () => {
@@ -98,8 +148,9 @@ export default function VideoPreviewPage({ params }: PageProps) {
     setError("");
 
     try {
-      // Save changes first
-      await handleSave();
+      // Save changes first (without showing toast)
+      const supabase = getSupabase();
+      await supabase.from("scripts").update({ caption, hashtags }).eq("id", id);
 
       // Call post API
       const response = await fetch("/api/videos/post", {
@@ -113,9 +164,12 @@ export default function VideoPreviewPage({ params }: PageProps) {
         throw new Error(data.error || "Failed to post video");
       }
 
+      showToast("Video posted successfully");
       router.push("/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      const message = err instanceof Error ? err.message : "An error occurred";
+      setError(message);
+      showToast(message, "error");
     } finally {
       setIsPosting(false);
     }
@@ -125,6 +179,7 @@ export default function VideoPreviewPage({ params }: PageProps) {
     const fullCaption = `${caption} ${formatHashtags(hashtags)}`;
     navigator.clipboard.writeText(fullCaption);
     setCopied(true);
+    showToast("Caption copied to clipboard");
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -233,9 +288,21 @@ export default function VideoPreviewPage({ params }: PageProps) {
                 </div>
               )}
 
-              <div className="flex items-center gap-2 mt-4 text-xs text-foreground-muted">
-                <Clock className="w-3 h-3" />
-                Created {formatRelativeTime(script.created_at)}
+              <div className="flex items-center justify-between mt-4">
+                <div className="flex items-center gap-2 text-xs text-foreground-muted">
+                  <Clock className="w-3 h-3" />
+                  Created {formatRelativeTime(script.created_at)}
+                </div>
+                {script.video_url && (
+                  <a
+                    href={script.video_url}
+                    download={`video-${script.id}.mp4`}
+                    className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download
+                  </a>
+                )}
               </div>
             </div>
           </motion.div>
@@ -316,6 +383,80 @@ export default function VideoPreviewPage({ params }: PageProps) {
                 <p className="mt-2 text-sm text-foreground-secondary">
                   {script.error_message}
                 </p>
+              </div>
+            )}
+
+            {/* Performance Metrics - only for Posted */}
+            {isPosted && (
+              <div className="card p-4">
+                <button
+                  onClick={() => setMetricsOpen(!metricsOpen)}
+                  className="w-full flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4 text-foreground-muted" />
+                    <span className="text-xs font-medium text-foreground-secondary uppercase tracking-wider">
+                      Performance Metrics
+                    </span>
+                  </div>
+                  {metricsOpen ? (
+                    <ChevronUp className="w-4 h-4 text-foreground-muted" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-foreground-muted" />
+                  )}
+                </button>
+
+                {metricsOpen && (
+                  <div className="mt-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input
+                        label="Views"
+                        type="number"
+                        value={metrics.views || ""}
+                        onChange={(e) =>
+                          setMetrics({ ...metrics, views: parseInt(e.target.value) || 0 })
+                        }
+                        placeholder="0"
+                      />
+                      <Input
+                        label="Likes"
+                        type="number"
+                        value={metrics.likes || ""}
+                        onChange={(e) =>
+                          setMetrics({ ...metrics, likes: parseInt(e.target.value) || 0 })
+                        }
+                        placeholder="0"
+                      />
+                      <Input
+                        label="Comments"
+                        type="number"
+                        value={metrics.comments || ""}
+                        onChange={(e) =>
+                          setMetrics({ ...metrics, comments: parseInt(e.target.value) || 0 })
+                        }
+                        placeholder="0"
+                      />
+                      <Input
+                        label="Shares"
+                        type="number"
+                        value={metrics.shares || ""}
+                        onChange={(e) =>
+                          setMetrics({ ...metrics, shares: parseInt(e.target.value) || 0 })
+                        }
+                        placeholder="0"
+                      />
+                    </div>
+                    <Button
+                      variant="secondary"
+                      onClick={handleSaveMetrics}
+                      disabled={isSavingMetrics}
+                      isLoading={isSavingMetrics}
+                      className="w-full"
+                    >
+                      Save Metrics
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </motion.div>

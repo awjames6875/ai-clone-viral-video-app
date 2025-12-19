@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Clock, AlertCircle } from "lucide-react";
+import { ArrowRight, Clock, AlertCircle, Star, Tag } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatRelativeTime, truncate } from "@/lib/utils";
@@ -11,6 +11,25 @@ import type { Script } from "@/lib/supabase";
 interface ScriptCardProps {
   script: Script;
   index?: number;
+}
+
+// Quality score color mapping
+function getQualityColor(score: number | null): string {
+  if (score === null) return "text-foreground-muted";
+  if (score >= 8) return "text-green-500";
+  if (score >= 6) return "text-yellow-500";
+  return "text-red-500";
+}
+
+// Pillar badge color mapping
+function getPillarColor(pillar: string | null): string {
+  switch (pillar) {
+    case "educational": return "bg-blue-500/10 text-blue-500";
+    case "entertainment": return "bg-purple-500/10 text-purple-500";
+    case "behind-scenes": return "bg-orange-500/10 text-orange-500";
+    case "storytelling": return "bg-pink-500/10 text-pink-500";
+    default: return "bg-gray-500/10 text-gray-500";
+  }
 }
 
 export function ScriptCard({ script, index = 0 }: ScriptCardProps) {
@@ -51,8 +70,25 @@ export function ScriptCard({ script, index = 0 }: ScriptCardProps) {
               )}
 
               {/* Footer */}
-              <div className="flex items-center gap-3 text-xs text-foreground-muted">
+              <div className="flex items-center gap-3 text-xs text-foreground-muted flex-wrap">
                 <StatusBadge status={script.status} />
+                
+                {/* Quality Score */}
+                {script.quality_score !== null && script.quality_score !== undefined && (
+                  <span className={`flex items-center gap-1 ${getQualityColor(script.quality_score)}`}>
+                    <Star className="w-3 h-3" />
+                    {script.quality_score}/10
+                  </span>
+                )}
+                
+                {/* Content Pillar */}
+                {script.pillar && (
+                  <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${getPillarColor(script.pillar)}`}>
+                    <Tag className="w-3 h-3" />
+                    {script.pillar}
+                  </span>
+                )}
+                
                 <span className="flex items-center gap-1">
                   <Clock className="w-3 h-3" />
                   {formatRelativeTime(script.created_at)}

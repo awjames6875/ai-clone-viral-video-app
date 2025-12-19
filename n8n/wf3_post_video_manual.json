@@ -1,5 +1,5 @@
 {
-  "name": "WF3 - Post Video Manual",
+  "name": "WF3 - Post Video Manual (Enhanced)",
   "nodes": [
     {
       "parameters": {
@@ -48,6 +48,12 @@
               "name": "requestedByUserId",
               "value": "={{ $json.body.requested_by_user_id }}",
               "type": "string"
+            },
+            {
+              "id": "id-6",
+              "name": "platforms",
+              "value": "={{ $json.body.platforms || ['tiktok', 'instagram', 'youtube'] }}",
+              "type": "object"
             }
           ]
         },
@@ -142,6 +148,43 @@
     },
     {
       "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-script",
+              "name": "scriptData",
+              "value": "={{ $('Fetch Script Data').first().json[0] }}",
+              "type": "object"
+            },
+            {
+              "id": "id-platforms",
+              "name": "targetPlatforms",
+              "value": "={{ $('Workflow Configuration').first().json.platforms }}",
+              "type": "object"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "prepare-posting",
+      "name": "Prepare Posting Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1100, -100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get script data and platforms\nconst scriptData = $('Prepare Posting Data').first().json.scriptData;\nconst platforms = $('Prepare Posting Data').first().json.targetPlatforms;\nconst platformCaptions = scriptData.platform_captions || {};\nconst defaultCaption = scriptData.caption + ' ' + (scriptData.hashtags || []).map(h => '#' + h).join(' ');\n\n// Create items for each platform\nconst items = platforms.map(platform => ({\n  json: {\n    platform: platform,\n    caption: platformCaptions[platform] || defaultCaption,\n    scriptId: scriptData.id\n  }\n}));\n\nreturn items;"
+      },
+      "id": "split-platforms",
+      "name": "Split by Platform",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, -100]
+    },
+    {
+      "parameters": {
         "method": "POST",
         "url": "https://api.blotato.com/v1/posts",
         "sendHeaders": true,
@@ -160,11 +203,15 @@
             {
               "parameterType": "formBinaryData",
               "name": "video",
-              "inputDataFieldName": "video"
+              "inputDataFieldName": "={{ $('Download Video Binary').first().binary.video }}"
             },
             {
               "name": "caption",
-              "value": "={{ $('Fetch Script Data').first().json[0].caption }} {{ $('Fetch Script Data').first().json[0].hashtags.map(h => '#' + h).join(' ') }}"
+              "value": "={{ $json.caption }}"
+            },
+            {
+              "name": "platform",
+              "value": "={{ $json.platform }}"
             }
           ]
         },
@@ -174,7 +221,17 @@
       "name": "Post to Blotato",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [1100, -100]
+      "position": [1540, -100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregate all posting results\nconst results = $input.all();\nconst postIds = {};\nconst platforms = [];\nlet allSucceeded = true;\n\nresults.forEach(item => {\n  const platform = item.json.platform || 'unknown';\n  platforms.push(platform);\n  if (item.json.post_id) {\n    postIds[platform] = item.json.post_id;\n  } else {\n    allSucceeded = false;\n  }\n});\n\nreturn [{\n  json: {\n    postIds,\n    platforms,\n    allSucceeded,\n    resultCount: results.length\n  }\n}];"
+      },
+      "id": "aggregate-results",
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, -100]
     },
     {
       "parameters": {
@@ -203,26 +260,26 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"status\": \"Posted\",\n  \"processed\": true,\n  \"posted_at\": \"{{ $now.toISO() }}\",\n  \"platforms\": {{ JSON.stringify($('Post to Blotato').first().json.platforms || ['blotato']) }},\n  \"post_ids\": {{ JSON.stringify($('Post to Blotato').first().json) }}\n}",
+        "jsonBody": "={\n  \"status\": \"Posted\",\n  \"processed\": true,\n  \"posted_at\": \"{{ $now.toISO() }}\",\n  \"platforms\": {{ JSON.stringify($json.platforms) }},\n  \"post_ids\": {{ JSON.stringify($json.postIds) }}\n}",
         "options": {}
       },
       "id": "update-supabase-success",
       "name": "Update Supabase Success",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [1320, -100]
+      "position": [1980, -100]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { success: true, script_id: $('Workflow Configuration').first().json.scriptId, status: 'Posted' } }}",
+        "responseBody": "={{ { success: true, script_id: $('Workflow Configuration').first().json.scriptId, status: 'Posted', platforms: $('Aggregate Results').first().json.platforms, post_ids: $('Aggregate Results').first().json.postIds } }}",
         "options": {}
       },
       "id": "respond-success",
       "name": "Respond Success",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1540, -100]
+      "position": [2200, -100]
     },
     {
       "parameters": {
@@ -237,6 +294,53 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [880, 100]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Workflow Configuration').first().json.supabaseUrl }}/rest/v1/scripts?id=eq.{{ $('Workflow Configuration').first().json.scriptId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"Failed\",\n  \"error_message\": \"Posting failed: {{ $json.error || 'Unknown error' }}\"\n}",
+        "options": {}
+      },
+      "id": "update-supabase-failed",
+      "name": "Update Supabase Failed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1760, 100],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, script_id: $('Workflow Configuration').first().json.scriptId, error: 'Posting failed' } }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "respond-failed",
+      "name": "Respond Failed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1980, 100]
     }
   ],
   "connections": {
@@ -256,23 +360,38 @@
       ]
     },
     "Download Video Binary": {
+      "main": [[{"node": "Prepare Posting Data", "type": "main", "index": 0}]]
+    },
+    "Prepare Posting Data": {
+      "main": [[{"node": "Split by Platform", "type": "main", "index": 0}]]
+    },
+    "Split by Platform": {
       "main": [[{"node": "Post to Blotato", "type": "main", "index": 0}]]
     },
     "Post to Blotato": {
+      "main": [
+        [{"node": "Aggregate Results", "type": "main", "index": 0}],
+        [{"node": "Update Supabase Failed", "type": "main", "index": 0}]
+      ]
+    },
+    "Aggregate Results": {
       "main": [[{"node": "Update Supabase Success", "type": "main", "index": 0}]]
     },
     "Update Supabase Success": {
       "main": [[{"node": "Respond Success", "type": "main", "index": 0}]]
+    },
+    "Update Supabase Failed": {
+      "main": [[{"node": "Respond Failed", "type": "main", "index": 0}]]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "wf3-v1",
+  "versionId": "wf3-v2-enhanced",
   "meta": {
     "instanceId": "viral-video-app"
   },
   "id": "wf3_post_video_manual",
-  "tags": ["viral-video-app", "video-posting"]
+  "tags": ["viral-video-app", "video-posting", "multi-platform"]
 }

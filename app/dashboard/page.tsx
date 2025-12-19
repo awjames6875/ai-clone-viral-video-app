@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { RefreshCw, Inbox } from "lucide-react";
+import { RefreshCw, Inbox, FileText, Clock, Video, CheckCircle, Search } from "lucide-react";
 import { Header } from "@/components/header";
 import { StatusTabs } from "@/components/status-tabs";
 import { ScriptCard, ScriptCardSkeleton } from "@/components/script-card";
@@ -16,6 +16,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<TabStatus>("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [userEmail, setUserEmail] = useState<string>();
 
   // Lazy init supabase client
@@ -89,11 +90,36 @@ export default function DashboardPage() {
     return result;
   }, [scripts]);
 
-  // Filter scripts
+  // Calculate posted this week
+  const postedThisWeek = useMemo(() => {
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    return scripts.filter(
+      (s) => s.status === "Posted" && new Date(s.posted_at || s.updated_at) > weekAgo
+    ).length;
+  }, [scripts]);
+
+  // Filter scripts by status and search query
   const filteredScripts = useMemo(() => {
-    if (activeTab === "all") return scripts;
-    return scripts.filter((script) => script.status === activeTab);
-  }, [scripts, activeTab]);
+    let result = scripts;
+
+    // Filter by status
+    if (activeTab !== "all") {
+      result = result.filter((script) => script.status === activeTab);
+    }
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter((script) => {
+        const hook = script.script_json?.hook || script.analysis_json?.hook || "";
+        const caption = script.caption || script.script_json?.caption || "";
+        return hook.toLowerCase().includes(query) || caption.toLowerCase().includes(query);
+      });
+    }
+
+    return result;
+  }, [scripts, activeTab, searchQuery]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -119,12 +145,56 @@ export default function DashboardPage() {
           </Button>
         </div>
 
+        {/* Stats cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          <div className="card p-3">
+            <div className="flex items-center gap-2 text-foreground-muted mb-1">
+              <FileText className="w-4 h-4" />
+              <span className="text-xs">Total</span>
+            </div>
+            <p className="text-xl font-semibold text-foreground">{scripts.length}</p>
+          </div>
+          <div className="card p-3">
+            <div className="flex items-center gap-2 text-status-pending mb-1">
+              <Clock className="w-4 h-4" />
+              <span className="text-xs">Pending</span>
+            </div>
+            <p className="text-xl font-semibold text-foreground">{counts["Pending Script"]}</p>
+          </div>
+          <div className="card p-3">
+            <div className="flex items-center gap-2 text-status-ready mb-1">
+              <Video className="w-4 h-4" />
+              <span className="text-xs">Ready to Post</span>
+            </div>
+            <p className="text-xl font-semibold text-foreground">{counts["Video Ready (Preview)"]}</p>
+          </div>
+          <div className="card p-3">
+            <div className="flex items-center gap-2 text-status-posted mb-1">
+              <CheckCircle className="w-4 h-4" />
+              <span className="text-xs">Posted (7d)</span>
+            </div>
+            <p className="text-xl font-semibold text-foreground">{postedThisWeek}</p>
+          </div>
+        </div>
+
         {/* Status tabs */}
         <div className="mb-6">
           <StatusTabs
             activeTab={activeTab}
             onTabChange={setActiveTab}
             counts={counts}
+          />
+        </div>
+
+        {/* Search */}
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-muted" />
+          <input
+            type="text"
+            placeholder="Search by hook or caption..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="input pl-10 w-full"
           />
         </div>
 
