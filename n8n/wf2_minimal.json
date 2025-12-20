@@ -1,0 +1,552 @@
+{
+  "name": "WF2 Minimal - Create Video",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "create-video",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "create-video-minimal"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 1: Extract script_id from webhook and set all config\nconst body = $input.first().json.body || $input.first().json;\nconst scriptId = body.script_id;\n\nif (!scriptId) {\n  return [{\n    json: {\n      error: true,\n      message: 'Missing script_id in request body'\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    scriptId: scriptId,\n    supabaseUrl: 'https://habpialjdsyczxxkkbcj.supabase.co',\n    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhYnBpYWxqZHN5Y3p4eGtrYmNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjAzODYzNSwiZXhwIjoyMDgxMzk4NjM1fQ.pvv_n-IEWRFF5-5KtPMk7MetVCiCLmfbFkwdFvq4Rb8',\n    heygenKey: 'sk_V2_hgu_kcWFcXGWWja_pBX4MbRCxxyS7DHusruaY50fcdSBq8zu',\n    talkingPhotoId: 'd3882e6017e04a569868b81c6d60fab6',\n    voiceId: '2d5b0e6cf36f460aa7fc47e3eee4ba54'\n  }\n}];"
+      },
+      "id": "extract-config",
+      "name": "Extract Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-error",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-valid-input",
+      "name": "If Valid Input",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://habpialjdsyczxxkkbcj.supabase.co/rest/v1/scripts?id=eq.{{ $json.scriptId }}&select=*",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $json.supabaseKey }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-script",
+      "name": "Fetch Script",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [660, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 2: Get script text and prepare for HeyGen\nconst scriptData = $input.first().json;\nconst script = Array.isArray(scriptData) ? scriptData[0] : scriptData;\n\nif (!script || !script.id) {\n  return [{\n    json: {\n      error: true,\n      message: 'Script not found in database'\n    }\n  }];\n}\n\nconst spokenScript = script.script_15s || \n  script.script_json?.spoken_script || \n  script.script_json?.script_15s ||\n  script.script_json?.hook;\n\nif (!spokenScript) {\n  return [{\n    json: {\n      error: true,\n      message: 'No script text found'\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    error: false,\n    scriptId: script.id,\n    spokenScript: spokenScript,\n    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhYnBpYWxqZHN5Y3p4eGtrYmNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjAzODYzNSwiZXhwIjoyMDgxMzk4NjM1fQ.pvv_n-IEWRFF5-5KtPMk7MetVCiCLmfbFkwdFvq4Rb8',\n    heygenKey: 'sk_V2_hgu_kcWFcXGWWja_pBX4MbRCxxyS7DHusruaY50fcdSBq8zu',\n    talkingPhotoId: 'd3882e6017e04a569868b81c6d60fab6',\n    voiceId: '2d5b0e6cf36f460aa7fc47e3eee4ba54'\n  }\n}];"
+      },
+      "id": "prepare-heygen",
+      "name": "Prepare HeyGen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "script-ok",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-script-ok",
+      "name": "If Script OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.heygen.com/v2/video/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $json.heygenKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"video_inputs\": [{\n    \"character\": {\n      \"type\": \"talking_photo\",\n      \"talking_photo_id\": \"{{ $json.talkingPhotoId }}\"\n    },\n    \"voice\": {\n      \"type\": \"text\",\n      \"voice_id\": \"{{ $json.voiceId }}\",\n      \"input_text\": {{ JSON.stringify($json.spokenScript) }}\n    }\n  }],\n  \"dimension\": {\n    \"width\": 1080,\n    \"height\": 1920\n  }\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "create-video",
+      "name": "Create Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1320, 100],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 3: Check if video creation succeeded and get video_id\nconst response = $input.first().json;\nconst statusCode = response.statusCode;\nconst videoId = response.body?.data?.video_id;\n\nif (statusCode >= 200 && statusCode < 300 && videoId) {\n  return [{\n    json: {\n      error: false,\n      videoId: videoId,\n      supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhYnBpYWxqZHN5Y3p4eGtrYmNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjAzODYzNSwiZXhwIjoyMDgxMzk4NjM1fQ.pvv_n-IEWRFF5-5KtPMk7MetVCiCLmfbFkwdFvq4Rb8',\n      heygenKey: 'sk_V2_hgu_kcWFcXGWWja_pBX4MbRCxxyS7DHusruaY50fcdSBq8zu'\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    error: true,\n    message: response.body?.error?.message || response.body?.message || 'HeyGen API failed',\n    statusCode: statusCode\n  }\n}];"
+      },
+      "id": "check-create",
+      "name": "Check Create",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "create-ok",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-create-ok",
+      "name": "If Create OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1760, 100]
+    },
+    {
+      "parameters": {
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "id": "wait",
+      "name": "Wait 30s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1980, 0]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.heygen.com/v1/video_status.get?video_id={{ $json.videoId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $json.heygenKey }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "poll-status",
+      "name": "Poll Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2200, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 4: Check video status\nconst response = $input.first().json;\nconst status = response.body?.data?.status;\nconst videoUrl = response.body?.data?.video_url;\nconst videoId = response.body?.data?.video_id;\n\nif (status === 'completed' && videoUrl) {\n  return [{\n    json: {\n      action: 'SUCCESS',\n      videoUrl: videoUrl,\n      videoId: videoId,\n      supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhYnBpYWxqZHN5Y3p4eGtrYmNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjAzODYzNSwiZXhwIjoyMDgxMzk4NjM1fQ.pvv_n-IEWRFF5-5KtPMk7MetVCiCLmfbFkwdFvq4Rb8',\n      heygenKey: 'sk_V2_hgu_kcWFcXGWWja_pBX4MbRCxxyS7DHusruaY50fcdSBq8zu'\n    }\n  }];\n}\n\nif (status === 'failed') {\n  return [{\n    json: {\n      action: 'FAIL',\n      message: response.body?.data?.error || 'Video generation failed'\n    }\n  }];\n}\n\n// Still processing - retry\nreturn [{\n  json: {\n    action: 'RETRY',\n    videoId: videoId,\n    status: status,\n    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhYnBpYWxqZHN5Y3p4eGtrYmNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjAzODYzNSwiZXhwIjoyMDgxMzk4NjM1fQ.pvv_n-IEWRFF5-5KtPMk7MetVCiCLmfbFkwdFvq4Rb8',\n    heygenKey: 'sk_V2_hgu_kcWFcXGWWja_pBX4MbRCxxyS7DHusruaY50fcdSBq8zu'\n  }\n}];"
+      },
+      "id": "check-poll",
+      "name": "Check Poll",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2420, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-success",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "SUCCESS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-success",
+      "name": "If Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2640, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-retry",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "RETRY",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-retry",
+      "name": "If Retry",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2640, 200]
+    },
+    {
+      "parameters": {
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "id": "wait-retry",
+      "name": "Wait Retry",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2860, 200]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.heygen.com/v1/video_status.get?video_id={{ $json.videoId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $json.heygenKey }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "poll-retry",
+      "name": "Poll Retry",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [3080, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check retry poll result\nconst response = $input.first().json;\nconst status = response.body?.data?.status;\nconst videoUrl = response.body?.data?.video_url;\nconst videoId = response.body?.data?.video_id;\n\nif (status === 'completed' && videoUrl) {\n  return [{\n    json: {\n      action: 'SUCCESS',\n      videoUrl: videoUrl,\n      videoId: videoId,\n      supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhYnBpYWxqZHN5Y3p4eGtrYmNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjAzODYzNSwiZXhwIjoyMDgxMzk4NjM1fQ.pvv_n-IEWRFF5-5KtPMk7MetVCiCLmfbFkwdFvq4Rb8'\n    }\n  }];\n}\n\nif (status === 'failed') {\n  return [{\n    json: {\n      action: 'FAIL',\n      message: response.body?.data?.error || 'Video generation failed'\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    action: 'RETRY',\n    videoId: videoId,\n    status: status,\n    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhYnBpYWxqZHN5Y3p4eGtrYmNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjAzODYzNSwiZXhwIjoyMDgxMzk4NjM1fQ.pvv_n-IEWRFF5-5KtPMk7MetVCiCLmfbFkwdFvq4Rb8',\n    heygenKey: 'sk_V2_hgu_kcWFcXGWWja_pBX4MbRCxxyS7DHusruaY50fcdSBq8zu'\n  }\n}];"
+      },
+      "id": "check-retry",
+      "name": "Check Retry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3300, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "retry-success",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "SUCCESS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-retry-success",
+      "name": "If Retry Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [3520, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "continue-retry",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "RETRY",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-continue",
+      "name": "If Continue",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [3520, 400]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://habpialjdsyczxxkkbcj.supabase.co/rest/v1/scripts?video_job_id=eq.{{ $json.videoId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $json.supabaseKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"Video Ready (Preview)\",\n  \"video_url\": \"{{ $json.videoUrl }}\",\n  \"processed\": true\n}",
+        "options": {}
+      },
+      "id": "save-success",
+      "name": "Save Success",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2860, -100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"video_url\": \"{{ $json[0].video_url }}\",\n  \"script_id\": \"{{ $json[0].id }}\"\n}",
+        "options": {}
+      },
+      "id": "respond-ok",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [3080, -100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": false,\n  \"error\": \"{{ $json.message || 'Unknown error' }}\"\n}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "respond-error",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1320, 500]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{"node": "Extract Config", "type": "main", "index": 0}]]
+    },
+    "Extract Config": {
+      "main": [[{"node": "If Valid Input", "type": "main", "index": 0}]]
+    },
+    "If Valid Input": {
+      "main": [
+        [{"node": "Fetch Script", "type": "main", "index": 0}],
+        [{"node": "Respond Error", "type": "main", "index": 0}]
+      ]
+    },
+    "Fetch Script": {
+      "main": [[{"node": "Prepare HeyGen", "type": "main", "index": 0}]]
+    },
+    "Prepare HeyGen": {
+      "main": [[{"node": "If Script OK", "type": "main", "index": 0}]]
+    },
+    "If Script OK": {
+      "main": [
+        [{"node": "Create Video", "type": "main", "index": 0}],
+        [{"node": "Respond Error", "type": "main", "index": 0}]
+      ]
+    },
+    "Create Video": {
+      "main": [[{"node": "Check Create", "type": "main", "index": 0}]]
+    },
+    "Check Create": {
+      "main": [[{"node": "If Create OK", "type": "main", "index": 0}]]
+    },
+    "If Create OK": {
+      "main": [
+        [{"node": "Wait 30s", "type": "main", "index": 0}],
+        [{"node": "Respond Error", "type": "main", "index": 0}]
+      ]
+    },
+    "Wait 30s": {
+      "main": [[{"node": "Poll Status", "type": "main", "index": 0}]]
+    },
+    "Poll Status": {
+      "main": [[{"node": "Check Poll", "type": "main", "index": 0}]]
+    },
+    "Check Poll": {
+      "main": [[{"node": "If Success", "type": "main", "index": 0}]]
+    },
+    "If Success": {
+      "main": [
+        [{"node": "Save Success", "type": "main", "index": 0}],
+        [{"node": "If Retry", "type": "main", "index": 0}]
+      ]
+    },
+    "If Retry": {
+      "main": [
+        [{"node": "Wait Retry", "type": "main", "index": 0}],
+        [{"node": "Respond Error", "type": "main", "index": 0}]
+      ]
+    },
+    "Wait Retry": {
+      "main": [[{"node": "Poll Retry", "type": "main", "index": 0}]]
+    },
+    "Poll Retry": {
+      "main": [[{"node": "Check Retry", "type": "main", "index": 0}]]
+    },
+    "Check Retry": {
+      "main": [[{"node": "If Retry Success", "type": "main", "index": 0}]]
+    },
+    "If Retry Success": {
+      "main": [
+        [{"node": "Save Success", "type": "main", "index": 0}],
+        [{"node": "If Continue", "type": "main", "index": 0}]
+      ]
+    },
+    "If Continue": {
+      "main": [
+        [{"node": "Wait Retry", "type": "main", "index": 0}],
+        [{"node": "Respond Error", "type": "main", "index": 0}]
+      ]
+    },
+    "Save Success": {
+      "main": [[{"node": "Respond OK", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "wf2-minimal-v1",
+  "meta": {
+    "instanceId": "viral-video-app"
+  },
+  "id": "wf2_minimal",
+  "tags": ["viral-video-app"]
+}

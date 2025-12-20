@@ -1,0 +1,462 @@
+{
+  "name": "WF4 - Performance Feedback Loop Enhanced",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtDay": 1,
+              "triggerAtHour": 10
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Weekly Performance Analysis",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "code": "// Validate environment variables\nconst requiredVars = {\n  SUPABASE_URL: $env.SUPABASE_URL,\n  SUPABASE_SERVICE_ROLE_KEY: $env.SUPABASE_SERVICE_ROLE_KEY,\n  BLOTATO_API_KEY: $env.BLOTATO_API_KEY,\n  GEMINI_API_KEY: $env.GEMINI_API_KEY || null\n};\n\nconst missing = [];\nfor (const [key, value] of Object.entries(requiredVars)) {\n  if (!value && key !== 'GEMINI_API_KEY') {\n    missing.push(key);\n  }\n}\n\nif (missing.length > 0) {\n  throw new Error(`Missing required environment variables: ${missing.join(', ')}`);\n}\n\nconsole.log('✅ Starting weekly performance analysis');\n\nconst now = new Date();\nconst sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);\nconst thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);\n\nreturn [{\n  supabaseUrl: requiredVars.SUPABASE_URL,\n  supabaseServiceKey: requiredVars.SUPABASE_SERVICE_ROLE_KEY,\n  blotatoApiKey: requiredVars.BLOTATO_API_KEY,\n  geminiApiKey: requiredVars.GEMINI_API_KEY,\n  analysisDate: now.toISOString(),\n  sevenDaysAgo: sevenDaysAgo.toISOString(),\n  thirtyDaysAgo: thirtyDaysAgo.toISOString()\n}];"
+      },
+      "id": "validate-and-config",
+      "name": "Validate & Configure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0],
+      "onError": "stopWorkflow"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.supabaseUrl }}/rest/v1/scripts?status=in.(Posted,Partially Posted)&posted_at=gte.{{ $json.sevenDaysAgo }}&select=*&order=posted_at.desc",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $json.supabaseServiceKey }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-recent-posts",
+      "name": "Fetch Recent Posted Scripts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [440, 0],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "split-scripts",
+      "name": "Split Scripts for Processing",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "script",
+              "value": "={{ $json }}",
+              "type": "object"
+            },
+            {
+              "id": "id-2",
+              "name": "needsMetricsUpdate",
+              "value": "={{ !$json.our_metrics || !$json.our_metrics.views }}",
+              "type": "boolean"
+            },
+            {
+              "id": "id-3",
+              "name": "primaryPostId",
+              "value": "={{ $json.post_ids.tiktok || $json.post_ids.instagram || $json.post_ids.youtube }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "prepare-script",
+      "name": "Prepare Script Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.needsMetricsUpdate }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            },
+            {
+              "leftValue": "={{ $json.primaryPostId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-needs-metrics",
+      "name": "If Needs Metrics Update",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, 0]
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "id": "wait-api-limit",
+      "name": "Rate Limit Wait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1320, 0]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.blotato.com/v1/posts/{{ $('Prepare Script Data').first().json.primaryPostId }}/analytics",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $('Validate & Configure').first().json.blotatoApiKey }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "fetch-blotato-metrics",
+      "name": "Fetch Blotato Metrics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1540, 0],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.views }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "exists"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-has-valid-metrics",
+      "name": "If Has Valid Metrics",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1760, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "metrics",
+              "value": "={\n  \"views\": {{ $json.views || 0 }},\n  \"likes\": {{ $json.likes || 0 }},\n  \"comments\": {{ $json.comments || 0 }},\n  \"shares\": {{ $json.shares || 0 }},\n  \"engagement_rate\": {{ ($json.likes + $json.comments + $json.shares) / Math.max($json.views, 1) }},\n  \"captured_at\": \"{{ $('Validate & Configure').first().json.analysisDate }}\",\n  \"platform_breakdown\": {{ JSON.stringify($json.platform_breakdown || {}) }}\n}",
+              "type": "object"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "calculate-metrics",
+      "name": "Calculate Enhanced Metrics",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1980, 0]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Validate & Configure').first().json.supabaseUrl }}/rest/v1/scripts?id=eq.{{ $('Prepare Script Data').first().json.script.id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('Validate & Configure').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $('Validate & Configure').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"our_metrics\": {{ JSON.stringify($json.metrics) }}\n}",
+        "options": {}
+      },
+      "id": "update-script-metrics",
+      "name": "Update Script Metrics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2200, 0],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Validate & Configure').first().json.supabaseUrl }}/rest/v1/scripts?status=in.(Posted,Partially Posted)&our_metrics=not.is.null&posted_at=gte.{{ $('Validate & Configure').first().json.thirtyDaysAgo }}&select=*",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('Validate & Configure').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $('Validate & Configure').first().json.supabaseServiceKey }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-performance-data",
+      "name": "Fetch Performance Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [440, 300],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "code": "// Analyze performance patterns\nconst scripts = $input.all()[0].json;\n\nif (!scripts || scripts.length === 0) {\n  return [{ analysis: 'No data available for analysis' }];\n}\n\n// Calculate performance metrics\nconst totalViews = scripts.reduce((sum, s) => sum + (s.our_metrics?.views || 0), 0);\nconst avgViews = totalViews / scripts.length;\nconst totalEngagement = scripts.reduce((sum, s) => {\n  const metrics = s.our_metrics || {};\n  return sum + (metrics.likes || 0) + (metrics.comments || 0) + (metrics.shares || 0);\n}, 0);\n\n// Find top performers (top 20%)\nconst sortedByViews = scripts.sort((a, b) => (b.our_metrics?.views || 0) - (a.our_metrics?.views || 0));\nconst topPerformers = sortedByViews.slice(0, Math.max(1, Math.ceil(scripts.length * 0.2)));\nconst bottomPerformers = sortedByViews.slice(-Math.max(1, Math.ceil(scripts.length * 0.2)));\n\n// Analyze patterns\nconst pillarPerformance = {};\nconst hookPatterns = {};\nconst musicPatterns = {};\n\nfor (const script of scripts) {\n  const pillar = script.pillar || 'unknown';\n  const views = script.our_metrics?.views || 0;\n  \n  if (!pillarPerformance[pillar]) {\n    pillarPerformance[pillar] = { views: 0, count: 0 };\n  }\n  pillarPerformance[pillar].views += views;\n  pillarPerformance[pillar].count += 1;\n  \n  // Analyze hooks\n  const hook = script.script_json?.hook || '';\n  const hookType = hook.startsWith('Did you know') ? 'question' : \n                  hook.includes('!') ? 'exclamation' :\n                  hook.toLowerCase().includes('imagine') ? 'scenario' : 'other';\n  \n  if (!hookPatterns[hookType]) {\n    hookPatterns[hookType] = { views: 0, count: 0 };\n  }\n  hookPatterns[hookType].views += views;\n  hookPatterns[hookType].count += 1;\n}\n\n// Calculate averages\nfor (const pillar in pillarPerformance) {\n  pillarPerformance[pillar].avgViews = pillarPerformance[pillar].views / pillarPerformance[pillar].count;\n}\n\nfor (const hookType in hookPatterns) {\n  hookPatterns[hookType].avgViews = hookPatterns[hookType].views / hookPatterns[hookType].count;\n}\n\n// Generate insights\nconst bestPillar = Object.entries(pillarPerformance)\n  .sort(([,a], [,b]) => b.avgViews - a.avgViews)[0];\n  \nconst bestHookType = Object.entries(hookPatterns)\n  .sort(([,a], [,b]) => b.avgViews - a.avgViews)[0];\n\nconst analysis = {\n  summary: {\n    total_scripts: scripts.length,\n    total_views: totalViews,\n    avg_views: Math.round(avgViews),\n    total_engagement: totalEngagement,\n    avg_engagement_rate: totalEngagement / Math.max(totalViews, 1)\n  },\n  top_performers: topPerformers.slice(0, 5).map(s => ({\n    id: s.id,\n    views: s.our_metrics?.views || 0,\n    pillar: s.pillar,\n    hook: s.script_json?.hook?.substring(0, 50) + '...'\n  })),\n  pillar_performance: pillarPerformance,\n  hook_performance: hookPatterns,\n  insights: [\n    `Best performing pillar: ${bestPillar?.[0]} (${Math.round(bestPillar?.[1]?.avgViews || 0)} avg views)`,\n    `Best hook type: ${bestHookType?.[0]} (${Math.round(bestHookType?.[1]?.avgViews || 0)} avg views)`,\n    `Scripts above average: ${scripts.filter(s => (s.our_metrics?.views || 0) > avgViews).length}/${scripts.length}`,\n    `Engagement rate trend: ${(totalEngagement / Math.max(totalViews, 1) * 100).toFixed(2)}%`\n  ],\n  recommendations: [\n    bestPillar?.[1]?.avgViews > avgViews * 1.2 ? `Focus more on ${bestPillar[0]} content` : null,\n    bestHookType?.[1]?.avgViews > avgViews * 1.2 ? `Use more ${bestHookType[0]}-style hooks` : null,\n    avgViews < 1000 ? 'Consider improving hook strategies for better retention' : null,\n    'Test different posting times to optimize reach'\n  ].filter(Boolean),\n  analysis_date: $('Validate & Configure').first().json.analysisDate\n};\n\nreturn [{ analysis }];"
+      },
+      "id": "analyze-performance",
+      "name": "Analyze Performance Patterns",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Validate & Configure').first().json.geminiApiKey }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-has-gemini",
+      "name": "If Has Gemini API",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "models/gemini-1.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "Based on this performance analysis, provide actionable content strategy recommendations:\\n\\n{{ JSON.stringify($('Analyze Performance Patterns').first().json.analysis, null, 2) }}\\n\\nReturn JSON with:\\n{\\n  \"priority_actions\": [\"action1\", \"action2\"],\\n  \"content_focus\": \"what type of content to prioritize\",\\n  \"hook_strategy\": \"specific hook recommendations\",\\n  \"posting_strategy\": \"timing and frequency recommendations\",\\n  \"risk_assessment\": \"potential issues to watch\"\\n}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {}
+      },
+      "id": "generate-ai-recommendations",
+      "name": "Generate AI Recommendations",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [1100, 300],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "finalReport",
+              "value": "={\n  \"performance_analysis\": {{ JSON.stringify($('Analyze Performance Patterns').first().json.analysis) }},\n  \"ai_recommendations\": {{ JSON.stringify($json || {}) }},\n  \"generated_at\": \"{{ $('Validate & Configure').first().json.analysisDate }}\"\n}",
+              "type": "object"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "prepare-final-report",
+      "name": "Prepare Final Report",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1320, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Validate & Configure').first().json.supabaseUrl }}/rest/v1/performance_reports",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('Validate & Configure').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $('Validate & Configure').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.finalReport }}",
+        "options": {}
+      },
+      "id": "save-performance-report",
+      "name": "Save Performance Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1540, 300],
+      "onError": "continueErrorOutput"
+    }
+  ],
+  "connections": {
+    "Weekly Performance Analysis": {
+      "main": [[{"node": "Validate & Configure", "type": "main", "index": 0}]]
+    },
+    "Validate & Configure": {
+      "main": [
+        [{"node": "Fetch Recent Posted Scripts", "type": "main", "index": 0}],
+        [{"node": "Fetch Performance Data", "type": "main", "index": 0}]
+      ]
+    },
+    "Fetch Recent Posted Scripts": {
+      "main": [[{"node": "Split Scripts for Processing", "type": "main", "index": 0}]]
+    },
+    "Split Scripts for Processing": {
+      "main": [[{"node": "Prepare Script Data", "type": "main", "index": 0}]]
+    },
+    "Prepare Script Data": {
+      "main": [[{"node": "If Needs Metrics Update", "type": "main", "index": 0}]]
+    },
+    "If Needs Metrics Update": {
+      "main": [[{"node": "Rate Limit Wait", "type": "main", "index": 0}]]
+    },
+    "Rate Limit Wait": {
+      "main": [[{"node": "Fetch Blotato Metrics", "type": "main", "index": 0}]]
+    },
+    "Fetch Blotato Metrics": {
+      "main": [[{"node": "If Has Valid Metrics", "type": "main", "index": 0}]]
+    },
+    "If Has Valid Metrics": {
+      "main": [[{"node": "Calculate Enhanced Metrics", "type": "main", "index": 0}]]
+    },
+    "Calculate Enhanced Metrics": {
+      "main": [[{"node": "Update Script Metrics", "type": "main", "index": 0}]]
+    },
+    "Fetch Performance Data": {
+      "main": [[{"node": "Analyze Performance Patterns", "type": "main", "index": 0}]]
+    },
+    "Analyze Performance Patterns": {
+      "main": [[{"node": "If Has Gemini API", "type": "main", "index": 0}]]
+    },
+    "If Has Gemini API": {
+      "main": [
+        [{"node": "Generate AI Recommendations", "type": "main", "index": 0}],
+        [{"node": "Prepare Final Report", "type": "main", "index": 0}]
+      ]
+    },
+    "Generate AI Recommendations": {
+      "main": [[{"node": "Prepare Final Report", "type": "main", "index": 0}]]
+    },
+    "Prepare Final Report": {
+      "main": [[{"node": "Save Performance Report", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "wf4-v2-enhanced",
+  "meta": {
+    "instanceId": "viral-video-app"
+  },
+  "id": "wf4_performance_feedback_loop",
+  "tags": ["viral-video-app", "analytics", "performance", "ai-insights", "enhanced"]
+}

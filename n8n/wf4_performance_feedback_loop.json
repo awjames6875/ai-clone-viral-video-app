@@ -1,0 +1,314 @@
+{
+  "name": "WF4 - Performance Feedback Loop",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtDay": 1,
+              "triggerAtHour": 10
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Weekly Performance Analysis",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "supabaseUrl",
+              "value": "={{$env.SUPABASE_URL}}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "supabaseServiceKey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "blotatoApiKey",
+              "value": "={{$env.BLOTATO_API_KEY}}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "workflow-config",
+      "name": "Workflow Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.supabaseUrl }}/rest/v1/scripts?status=eq.Posted&select=*&order=posted_at.desc&limit=50",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.supabaseServiceKey }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-posted-scripts",
+      "name": "Fetch Posted Scripts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter scripts that need metrics update (posted in last 7 days, no our_metrics yet)\nconst scripts = $input.all()[0].json;\nconst sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);\n\nconst needsUpdate = scripts.filter(script => {\n  const postedAt = new Date(script.posted_at);\n  return postedAt > sevenDaysAgo && (!script.our_metrics || !script.our_metrics.views);\n});\n\nreturn needsUpdate.map(script => ({ json: script }));"
+      },
+      "id": "filter-needs-metrics",
+      "name": "Filter Scripts Needing Metrics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.blotato.com/v1/posts/{{ $json.post_ids.tiktok || $json.post_ids.instagram }}/analytics",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Workflow Configuration').first().json.blotatoApiKey }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "fetch-blotato-metrics",
+      "name": "Fetch Blotato Metrics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-1",
+              "leftValue": "={{ $json.views }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "exists"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-has-metrics",
+      "name": "IF Has Metrics",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, 0]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Workflow Configuration').first().json.supabaseUrl }}/rest/v1/scripts?id=eq.{{ $('Filter Scripts Needing Metrics').item.json.id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"our_metrics\": {\n    \"views\": {{ $json.views || 0 }},\n    \"likes\": {{ $json.likes || 0 }},\n    \"comments\": {{ $json.comments || 0 }},\n    \"shares\": {{ $json.shares || 0 }},\n    \"captured_at\": \"{{ $now.toISO() }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "update-script-metrics",
+      "name": "Update Script Metrics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1320, -100]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Workflow Configuration').first().json.supabaseUrl }}/rest/v1/scripts?status=eq.Posted&our_metrics=not.is.null&select=*",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-scripts-with-metrics",
+      "name": "Fetch Scripts with Metrics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "models/gemini-1.5-pro"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ 'Analyze these posted scripts and their performance metrics to identify patterns and insights.\\n\\n=== SCRIPTS DATA ===\\n' + JSON.stringify($json) + '\\n\\nFor each script, compare our_metrics to source_metrics and identify:\\n1. Which hooks performed best (highest view/engagement ratio)?\\n2. Which content pillars get the most engagement?\\n3. What posting patterns work (time, day)?\\n4. Any correlation between quality_score and actual performance?\\n\\nProvide insights as a JSON array:\\n[\\n  {\\n    \"insight_type\": \"winning_hook\",\\n    \"insight_data\": {\"hook_style\": \"question\", \"avg_engagement_rate\": 0.05, \"examples\": [\"...\"]},\\n    \"confidence\": 0.8,\\n    \"source_script_ids\": [\"uuid1\", \"uuid2\"]\\n  },\\n  {\\n    \"insight_type\": \"best_pillar\",\\n    \"insight_data\": {\"pillar\": \"educational\", \"avg_views\": 50000},\\n    \"confidence\": 0.7,\\n    \"source_script_ids\": [\"uuid1\"]\\n  }\\n]\\n\\nOnly include insights with confidence > 0.5. Focus on actionable patterns.' }}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {}
+      },
+      "id": "analyze-performance",
+      "name": "Analyze Performance Patterns",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Split insights into individual items for insertion\nconst insights = $input.first().json;\nif (!Array.isArray(insights)) {\n  return [{ json: insights }];\n}\nreturn insights.map(insight => ({ json: insight }));"
+      },
+      "id": "split-insights",
+      "name": "Split Insights",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Workflow Configuration').first().json.supabaseUrl }}/rest/v1/insights",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"insight_type\": \"{{ $json.insight_type }}\",\n  \"insight_data\": {{ JSON.stringify($json.insight_data) }},\n  \"confidence\": {{ $json.confidence }},\n  \"source_script_ids\": {{ JSON.stringify($json.source_script_ids || []) }}\n}",
+        "options": {}
+      },
+      "id": "insert-insights",
+      "name": "Insert Insights",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1100, 300]
+    }
+  ],
+  "connections": {
+    "Weekly Performance Analysis": {
+      "main": [[{"node": "Workflow Configuration", "type": "main", "index": 0}]]
+    },
+    "Workflow Configuration": {
+      "main": [
+        [{"node": "Fetch Posted Scripts", "type": "main", "index": 0}],
+        [{"node": "Fetch Scripts with Metrics", "type": "main", "index": 0}]
+      ]
+    },
+    "Fetch Posted Scripts": {
+      "main": [[{"node": "Filter Scripts Needing Metrics", "type": "main", "index": 0}]]
+    },
+    "Filter Scripts Needing Metrics": {
+      "main": [[{"node": "Fetch Blotato Metrics", "type": "main", "index": 0}]]
+    },
+    "Fetch Blotato Metrics": {
+      "main": [[{"node": "IF Has Metrics", "type": "main", "index": 0}]]
+    },
+    "IF Has Metrics": {
+      "main": [
+        [{"node": "Update Script Metrics", "type": "main", "index": 0}],
+        []
+      ]
+    },
+    "Fetch Scripts with Metrics": {
+      "main": [[{"node": "Analyze Performance Patterns", "type": "main", "index": 0}]]
+    },
+    "Analyze Performance Patterns": {
+      "main": [[{"node": "Split Insights", "type": "main", "index": 0}]]
+    },
+    "Split Insights": {
+      "main": [[{"node": "Insert Insights", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "wf4-v1",
+  "meta": {
+    "instanceId": "viral-video-app"
+  },
+  "id": "wf4_performance_feedback_loop",
+  "tags": ["viral-video-app", "analytics", "feedback-loop"]
+}

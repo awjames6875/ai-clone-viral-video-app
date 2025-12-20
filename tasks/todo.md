@@ -1,245 +1,142 @@
-# Viral Video App - Implementation Plan
+# WF2 - HeyGen Video Creation Workflow Fix
 
-## Overview
-Build a premium mobile-first Next.js dashboard that integrates with n8n workflows for viral video content creation.
-
----
-
-## Phase 1: n8n Workflow Files (Create from existing workflow)
-
-### Extracted from existing `AI Agent workflow.json`:
-**Current Flow:**
-1. Daily TikTok Scraper Schedule (9 AM trigger)
-2. Workflow Configuration (set API keys, niche)
-3. Scrape TikTok Viral Videos
-4. Extract Video Data
-5. Analyze Video with Gemini
-6. Generate Script with Gemini
-7. Save Script to Google Sheets ← **REPLACE WITH SUPABASE**
-8. Approval Trigger (Google Sheets polling) ← **REPLACE WITH WEBHOOK**
-9. Prepare Approved Script Data
-10. Create Video with Heygen
-11. Check Heygen Video Status
-12. Download Heygen Video
-13. Post to All Platforms via Blotato
-
-### Tasks:
-- [ ] **1.1** Create `/n8n/wf1_daily_script_generator.json`
-  - Nodes: Schedule → Config → Scrape → Extract → Analyze → Generate Script → Insert to Supabase (status: "Pending Script")
-  - Replace Google Sheets with Supabase INSERT
-
-- [ ] **1.2** Create `/n8n/wf2_create_video_draft.json`
-  - Webhook trigger: `approve-script`
-  - Nodes: Webhook → Update Supabase (status: "Script Approved") → Create Heygen Video → Poll Status → Download → Store video_url → Update Supabase (status: "Video Ready (Preview)")
-
-- [ ] **1.3** Create `/n8n/wf3_post_video_manual.json`
-  - Webhook trigger: `post-video`
-  - Nodes: Webhook → Fetch Script Data → Post via Blotato → Update Supabase (status: "Posted")
+## Goal
+Create a robust n8n workflow that:
+1. Tests HeyGen API auth before generating videos
+2. Dynamically fetches available avatars and selects by name
+3. Creates HeyGen videos from approved scripts
+4. Polls for completion with proper retry/backoff logic
+5. Updates Supabase with success/failure status
 
 ---
 
-## Phase 2: Database Setup
+## Phase 1: Core Workflow Structure
 
-### Tasks:
-- [ ] **2.1** Create `/supabase/schema.sql`
-  - Table: `scripts` with all required fields
-  - Proper indexes for status filtering
+### Tasks
 
-- [ ] **2.2** Create `/supabase/rls.sql`
-  - Row Level Security policies
-  - User-based access control
-
-- [ ] **2.3** Create `/lib/supabase.ts`
-  - Typed Supabase client
-  - Type definitions for scripts table
-
----
-
-## Phase 3: Next.js Project Setup
-
-### Tasks:
-- [ ] **3.1** Initialize Next.js App Router project
-  - TypeScript configuration
-  - Tailwind CSS setup
-  - shadcn/ui installation
-
-- [ ] **3.2** Create `.env.example`
+- [x] **1.1** Create new workflow JSON with proper n8n Cloud compatibility (hardcoded values, no $env)
+- [x] **1.2** Add Webhook Trigger node (POST /approve-script)
+- [x] **1.3** Add Workflow Configuration node with hardcoded placeholders for:
   - SUPABASE_URL
-  - SUPABASE_ANON_KEY
   - SUPABASE_SERVICE_ROLE_KEY
-  - N8N_BASE_URL
-  - N8N_WEBHOOK_SECRET
-
-- [ ] **3.3** Setup Framer Motion
-  - Install dependencies
-  - Create animation variants
+  - HEYGEN_API_KEY
+  - AVATAR_NAME (for dynamic lookup)
+- [x] **1.4** Add Fetch Script Data node (GET from Supabase)
 
 ---
 
-## Phase 4: API Routes
+## Phase 2: HeyGen Auth & Avatar Selection
 
-### Tasks:
-- [ ] **4.1** Create `POST /api/scripts/approve`
-  - Validate script status = "Pending Script"
-  - Update status to "Script Approved"
-  - Call n8n webhook: `${N8N_BASE_URL}/webhook/approve-script`
-  - Pass: `{ script_id, requested_by_user_id }`
+### Tasks
 
-- [ ] **4.2** Create `POST /api/videos/post`
-  - Validate status = "Video Ready (Preview)" AND processed = false
-  - Call n8n webhook: `${N8N_BASE_URL}/webhook/post-video`
-  - Pass: `{ script_id, requested_by_user_id }`
-
-- [ ] **4.3** Create script CRUD routes
-  - GET /api/scripts - List with status filter
-  - GET /api/scripts/[id] - Single script
-  - PATCH /api/scripts/[id] - Update script fields
+- [x] **2.1** Add HeyGen Auth Test node (GET /v2/avatars) to validate API key
+- [x] **2.2** Add IF node to check auth success (401/403 = config error, stop workflow)
+- [x] **2.3** Add Code node to extract avatar_id from avatars list by name matching
+- [x] **2.4** Add IF node to check if avatar was found (404 = avatar not found, fail gracefully)
 
 ---
 
-## Phase 5: UI Pages
+## Phase 3: Video Generation
 
-### Tasks:
-- [ ] **5.1** Create `/login` page
-  - Supabase Auth (email/password)
-  - Clean branded layout
-  - Error handling
+### Tasks
 
-- [ ] **5.2** Create `/app` (dashboard) page
-  - Status tabs: Pending Script | Script Approved | Video Ready | Posted | Failed
-  - Script cards with:
-    - Hook preview (from script_json or analysis_json)
-    - Caption snippet
-    - Created time
-    - Status badge (color-coded)
-  - Skeleton loaders
-  - Empty states
-
-- [ ] **5.3** Create `/app/scripts/[id]` page
-  - Script editor:
-    - spoken_script (editable textarea)
-    - caption (editable input)
-    - hashtags (editable chips/tags)
-    - on_screen_text (editable)
-    - music_track (editable)
-  - Buttons:
-    - Save Draft (Supabase update only)
-    - Approve Script (POST /api/scripts/approve)
-  - "What happens next" panel showing WF2 nodes:
-    - "HeyGen Generate Video"
-    - "Wait / Poll for Completion"
-    - "Update Status to Video Ready"
-  - Guardrails: Disable Approve if status != "Pending Script"
-
-- [ ] **5.4** Create `/app/videos/[id]` page
-  - Video player (video_url)
-  - Caption + hashtags editing
-  - Post Video button (POST /api/videos/post)
-  - Guardrails: Disable Post unless status = "Video Ready (Preview)" AND processed = false
+- [x] **3.1** Add Update Status to "Script Approved" node
+- [x] **3.2** Add Create HeyGen Video node (POST /v2/video/generate) with:
+  - Proper headers (X-Api-Key, Content-Type, Accept)
+  - Correct JSON body structure for v2 API
+  - Dynamic avatar_id from Phase 2
+  - spoken_script from Fetch Script Data
+- [x] **3.3** Add Update Status to "Video Generating" node with video_job_id
 
 ---
 
-## Phase 6: UI Components
+## Phase 4: Polling with Retry/Backoff
 
-### Tasks:
-- [ ] **6.1** Create shared components
-  - StatusBadge (color-coded by status)
-  - ScriptCard (dashboard list item)
-  - SkeletonCard (loading state)
-  - EmptyState (no items)
-  - StickyHeader (mobile navigation)
+### Tasks
 
-- [ ] **6.2** Create Framer Motion animations
-  - List item transitions (staggered)
-  - Button feedback (scale/tap)
-  - Page transitions
-  - Loading shimmer
-
-- [ ] **6.3** Create form components
-  - HashtagInput (chips with add/remove)
-  - ScriptTextarea (with character count)
-  - VideoPlayer (with controls)
+- [x] **4.1** Add Wait node (30 seconds initial delay)
+- [x] **4.2** Add Check HeyGen Status node (GET /v1/video_status.get)
+- [x] **4.3** Add IF node for status check (completed/failed/pending)
+- [x] **4.4** Add retry loop with backoff (max 5 retries, 30s spacing)
+- [x] **4.5** Add Code node to track retry count and handle backoff logic
+- [x] **4.6** Add error handling for 5xx responses (retry with backoff)
 
 ---
 
-## Phase 7: State Machine & Error Handling
+## Phase 5: Final Status Updates
 
-### Tasks:
-- [ ] **7.1** Implement status flow enforcement
-  - Pending Script → Script Approved → Video Ready (Preview) → Posted
-  - Failed state from WF2/WF3
-  - Display error_message on failed items
+### Tasks
 
-- [ ] **7.2** Add retry placeholders
-  - Retry button on Failed items
-  - Visual error indicators
+- [x] **5.1** Add Update Supabase Success node (status=Video Ready (Preview), video_url, processed=true)
+- [x] **5.2** Add Update Supabase Failed node (status=Video Failed, error_message)
+- [x] **5.3** Add Respond Success webhook response
+- [x] **5.4** Add Respond Failed webhook response
 
 ---
-
-## Phase 8: Documentation
-
-### Tasks:
-- [ ] **8.1** Create `/README.md`
-  - Supabase setup instructions
-  - Environment variables guide
-  - n8n webhook configuration
-  - How to import workflows
-  - How to run the UI
-
----
-
-## Status Legend (for UI badges)
-| Status | Color | Description |
-|--------|-------|-------------|
-| Pending Script | Yellow | Awaiting review/edit |
-| Script Approved | Blue | WF2 triggered, generating video |
-| Video Ready (Preview) | Purple | Video ready for review |
-| Posted | Green | Successfully posted |
-| Failed | Red | Error occurred |
-
----
-
-## Webhook Payload Format
-```json
-{
-  "script_id": "uuid",
-  "tenant_id": "optional-string",
-  "requested_by_user_id": "user-uuid"
-}
-```
 
 ## Review Section
 
-### 2025-12-17: Performance Tracking Enhancement
+### 2025-12-19: WF2 HeyGen Integration Fix
 
-**Summary:** Added performance tracking to measure how repurposed viral content performs vs. the original source video.
+**Summary:** Completely rebuilt WF2 workflow with robust HeyGen API integration.
 
 **Changes Made:**
 
-1. **Database Migration** (`add_performance_tracking`)
-   - Added 5 new columns to `scripts` table:
-     - `source_metrics` (JSONB) - Original viral video stats (views, likes, captured_at)
-     - `posted_at` (TIMESTAMPTZ) - When content was posted
-     - `platforms` (TEXT[]) - Array of platforms posted to
-     - `post_ids` (JSONB) - Post IDs from Blotato response
-     - `our_metrics` (JSONB) - Our content's performance (manual entry initially)
-   - Added index on `posted_at` for efficient querying
+1. **Removed $env references** - All config values are now hardcoded (n8n Cloud compatible)
+2. **Added HeyGen Auth Test** - GET /v2/avatars validates API key before proceeding
+3. **Dynamic avatar selection** - Fetches avatar list and matches by name (partial, case-insensitive)
+4. **Correct v2 API payload** - Uses proper HeyGen v2 video/generate structure
+5. **Robust polling** - 5 attempts with 30s spacing, handles 5xx errors with retry
+6. **Comprehensive error handling**:
+   - 401/403 → Auth failed response
+   - 404 avatar → Lists available avatars in error message
+   - 5xx → Retries with backoff
+   - Timeout → Marks as failed after max attempts
 
-2. **WF1 Update** (`n8n/wf1_daily_script_generator.json`)
-   - Modified "Insert Script to Supabase" node
-   - Now captures `source_metrics` with views/likes from the scraped TikTok video
+**Workflow Flow:**
+```
+Webhook → Config → Auth Test → Select Avatar → Fetch Script →
+Prepare Data → Update Approved → Create Video → Init Poll →
+Wait → Check Status → [SUCCESS/RETRY/FAIL]
+```
 
-3. **WF3 Update** (`n8n/wf3_post_video_manual.json`)
-   - Modified "Update Supabase Success" node
-   - Now captures `posted_at`, `platforms`, and `post_ids` from Blotato response
+**Values to Replace in n8n:**
+1. `supabaseUrl` → YOUR_SUPABASE_URL (e.g., https://xxx.supabase.co)
+2. `supabaseServiceKey` → YOUR_SUPABASE_SERVICE_ROLE_KEY
+3. `avatarName` → Name of your HeyGen avatar (currently "Adam CEO")
 
-**Impact:** Minimal - ~15 lines of SQL, ~10 lines of JSON changes
+**HeyGen API Key:** Already set to your new key (sk_V2_hgu_...)
 
-**Future Work:**
-- Add UI for manual `our_metrics` entry
-- Create WF4 for automated metrics polling (if Blotato API supports it)
-- Build dashboard to compare source vs. our performance
+**Nodes (28 total):**
+- Webhook Trigger
+- Workflow Configuration
+- HeyGen Auth Test
+- If Auth Success / Respond Auth Failed
+- Select Avatar by Name
+- If Avatar Found / Respond Avatar Not Found
+- Fetch Script Data
+- Prepare Video Data
+- If Script Valid / Respond Script Invalid
+- Update Status to Approved
+- Create HeyGen Video
+- If Create Success / Update Create Failed / Respond Create Failed
+- Init Polling State
+- Update Status Generating
+- Wait Before Poll
+- Check HeyGen Status
+- Process Poll Result
+- If Poll Success / If Retry Needed
+- Update Poll State
+- Wait Retry
+- Check Status Retry
+- Process Retry Result
+- If Retry Success / If Continue Retry
+- Update Supabase Success / Respond Success
+- Update Success (Retry) / Respond Success (Retry)
+- Update Supabase Failed / Respond Failed
 
----
-
-**AWAITING APPROVAL TO BEGIN IMPLEMENTATION**
+**Next Steps:**
+1. Import workflow JSON to n8n Cloud
+2. Replace placeholder values (supabaseUrl, supabaseServiceKey)
+3. Test with a script record in Supabase
+4. Monitor execution logs for any issues

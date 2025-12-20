@@ -1,121 +1,143 @@
 # Handoff State
 
-**Timestamp:** 2025-12-18
+**Timestamp:** 2025-12-20 03:30 AM EST
 **Branch:** main
-**Status:** Ready for IDE switch
+**Status:** WF2 Debugging In Progress - URL Query Parameter Fix Needed
 
 ---
 
-## What Was Just Completed
+## What You Were Working On
 
-### Performance Tracking Enhancement
-Added performance tracking to measure how repurposed viral content performs vs. the original source video.
+### WF2 (Create Video Draft) Workflow Fix
 
-**Changes Made:**
+Debugging the n8n workflow that creates HeyGen videos from approved scripts. The workflow receives a script_id via webhook, fetches the script from Supabase, creates a HeyGen video, polls for completion, and updates Supabase with the video URL.
 
-1. **Database Migration** (`add_performance_tracking` - version 20251217141151)
-   - Added 5 new columns to `scripts` table:
-     - `source_metrics` (JSONB) - Original viral video stats
-     - `posted_at` (TIMESTAMPTZ) - When content was posted
-     - `platforms` (TEXT[]) - Array of platforms posted to
-     - `post_ids` (JSONB) - Post IDs from Blotato response
-     - `our_metrics` (JSONB) - Our content's performance
-
-2. **WF1 Update** - Now captures `source_metrics` with views/likes from scraped TikTok video
-
-3. **WF3 Update** - Now captures `posted_at`, `platforms`, and `post_ids` from Blotato response
+**Root Cause Identified:** The `Fetch Script` HTTP Request node returns empty data because n8n has issues with expressions embedded directly in URLs. The query parameters need to use n8n's built-in Query Parameters feature instead.
 
 ---
 
-## Files Changed (Not Yet Committed)
+## Current Blocker & Fix Needed
 
-| File | Change |
-|------|--------|
-| `n8n/wf1_daily_script_generator.json` | Added source_metrics to INSERT |
-| `n8n/wf3_post_video_manual.json` | Added posted_at, platforms, post_ids to PATCH |
-| `tasks/todo.md` | Added review section for performance tracking |
+**Problem:** `Fetch Script` node returns empty `[[]]` even though the script exists in Supabase.
 
----
+**Fix:** Change from URL-embedded expressions to Query Parameters:
 
-## Database State (Supabase Migrations)
+### Current (Broken):
+```
+URL: =https://habpialjdsyczxxkkbcj.supabase.co/rest/v1/scripts?id=eq.{{ $json.scriptId }}&select=*
+```
 
-| Version | Name | Status |
-|---------|------|--------|
-| 20251217111554 | create_scripts_table | Applied |
-| 20251217111605 | add_rls_policies | Applied |
-| 20251217141151 | add_performance_tracking | Applied |
-
----
-
-## Next Steps (Suggested)
-
-1. **UI for manual metrics entry** - Add form for "Posted" scripts to input our content's performance
-2. **Comparison dashboard** - Show "Original: 1.2M views" vs "Ours: 5K views"
-3. **Multi-format repurposing** - Generate short/long/text versions from one viral video
-4. **Multi-platform scraping** - Add Instagram Reels, YouTube Shorts sources
+### Fixed (Do This):
+1. URL: `https://habpialjdsyczxxkkbcj.supabase.co/rest/v1/scripts` (no query string)
+2. Enable "Send Query Parameters" toggle
+3. Add parameter: Name=`id`, Value=`eq.{{ $json.scriptId }}`
+4. Add parameter: Name=`select`, Value=`*`
 
 ---
 
-## Environment Variables Needed
+## Test Data Available
 
-```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+**Test Script ID:** `648cc5c9-4349-4f3b-b43a-471eb95e2aac`
 
-# n8n Webhooks
-N8N_BASE_URL=https://your-n8n-instance.com
-N8N_WEBHOOK_SECRET=your-webhook-secret
-
-# TikTok Scraper
-TIKTOK_NICHE=your-niche
-TIKTOK_SCRAPER_API_URL=your-scraper-api
-
-# HeyGen
-HEYGEN_API_KEY=your-key
-HEYGEN_AVATAR_ID=your-avatar-id
-
-# Blotato
-BLOTATO_API_KEY=your-key
+This script exists in Supabase with status "Pending Script" and contains:
+```json
+{
+  "spoken_script": "Did you know that most people scroll past the best content? Here is a secret that top creators use. They hook you in the first 3 seconds. Try this technique and watch your views explode."
+}
 ```
 
 ---
 
-## Quick Resume Commands
+## Workflow Details
+
+**n8n Workflow ID:** `X0OvrziKjfp8kKrK`
+**Workflow Name:** WF2 - Create Video Draft
+**Webhook URL:** https://awjames.app.n8n.cloud/webhook/create-video
+**Test Webhook URL:** https://awjames.app.n8n.cloud/webhook-test/create-video
+
+**Headers Already Fixed:**
+- `apikey: {{ $json.supabaseKey }}` ✅
+- `Authorization: Bearer {{ $json.supabaseKey }}` ✅
+
+---
+
+## Resume Steps
+
+1. Open n8n: https://awjames.app.n8n.cloud
+2. Open workflow "WF2 - Create Video Draft"
+3. Click "Fetch Script" node
+4. Apply the Query Parameters fix above
+5. Save workflow
+6. Test via MCP or Postman:
+   ```json
+   POST /webhook-test/create-video
+   { "script_id": "648cc5c9-4349-4f3b-b43a-471eb95e2aac" }
+   ```
+
+---
+
+## Files Changed This Session
+
+| File | Changes |
+|------|---------|
+| `n8n/wf2_minimal.json` | Created minimal 20-node workflow (alternative) |
+| `n8n/wf2_create_video_draft.json` | Various debugging attempts |
+| `tasks/todo.md` | Updated with WF2 fix tasks |
+
+---
+
+## What's Working
+
+- ✅ n8n MCP connection (can search/execute workflows)
+- ✅ Supabase connection (curl commands work with auth headers)
+- ✅ Webhook trigger receiving requests
+- ✅ Extract Config node extracting scriptId correctly
+- ✅ If Valid Input passing data correctly
+- ❌ Fetch Script returning empty (needs Query Parameters fix)
+
+---
+
+## API Keys (Already in Workflow)
+
+- **Supabase Service Key:** Hardcoded in workflow ✅
+- **HeyGen API Key:** `sk_V2_hgu_kcWFcXGWWja_pBX4MbRCxxyS7DHusruaY50fcdSBq8zu` ✅
+- **Talking Photo ID:** `d3882e6017e04a569868b81c6d60fab6` ✅
+- **Voice ID:** `2d5b0e6cf36f460aa7fc47e3eee4ba54` ✅
+
+---
+
+## Quick Commands
 
 ```bash
 # Navigate to project
-cd "al clone viral video app"
+cd "c:\Users\1alph\OneDrive\Desktop\viral-video-app"
 
-# Check status
+# Check git status
 git status
 
-# Commit the performance tracking changes
-git add n8n/wf1_daily_script_generator.json n8n/wf3_post_video_manual.json tasks/todo.md
-git commit -m "Add performance tracking to measure content success"
+# Test Supabase fetch (works)
+curl -s "https://habpialjdsyczxxkkbcj.supabase.co/rest/v1/scripts?id=eq.648cc5c9-4349-4f3b-b43a-471eb95e2aac&select=*" \
+  -H "apikey: YOUR_KEY" \
+  -H "Authorization: Bearer YOUR_KEY"
 
-# Import updated workflows to n8n
-# - Import wf1_daily_script_generator.json
-# - Import wf3_post_video_manual.json
+# Start Next.js dashboard
+npm run dev
 ```
 
 ---
 
-## Project Overview
+## Project Context
 
-**What this app does:**
-1. Scrapes viral TikTok videos by niche
-2. Analyzes WHY they went viral (Gemini AI)
-3. Generates scripts mimicking the viral formula
-4. Creates AI avatar videos (HeyGen)
-5. Posts to all platforms (Blotato)
-6. **NEW:** Tracks performance to learn what works
+**App Purpose:** Viral video content automation
+1. Scrape TikTok for viral videos
+2. Analyze with Gemini AI
+3. Generate scripts
+4. Create AI avatar videos with HeyGen (← YOU ARE HERE)
+5. Post to social platforms via Blotato
 
-**Architecture:**
-```
-TikTok Scrape → Gemini Analysis → Script Generation → Supabase → HeyGen Video → Blotato Posting
-                                                        ↑
-                                                  source_metrics (NEW)
-                                                  our_metrics (NEW)
-```
+**Tech Stack:**
+- Next.js 14 (dashboard UI)
+- Supabase (database)
+- n8n Cloud (workflow automation)
+- HeyGen (AI video generation)
+- Blotato (social media posting)

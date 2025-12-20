@@ -1,5 +1,5 @@
 {
-  "name": "WF1 - Daily Script Generator (Enhanced)",
+  "name": "WF1 - Daily Script Generator (Safe Harbor)",
   "nodes": [
     {
       "parameters": {
@@ -19,60 +19,77 @@
     },
     {
       "parameters": {
-        "code": "// Validate all required environment variables\nconst requiredVars = {\n  TIKTOK_NICHE: $env.TIKTOK_NICHE,\n  TIKTOK_SCRAPER_API_URL: $env.TIKTOK_SCRAPER_API_URL,\n  SUPABASE_URL: $env.SUPABASE_URL,\n  SUPABASE_SERVICE_ROLE_KEY: $env.SUPABASE_SERVICE_ROLE_KEY,\n  DEFAULT_USER_ID: $env.DEFAULT_USER_ID || 'system-user'\n};\n\nconst missing = [];\nfor (const [key, value] of Object.entries(requiredVars)) {\n  if (!value || value.trim() === '') {\n    missing.push(key);\n  }\n}\n\nif (missing.length > 0) {\n  throw new Error(`Missing required environment variables: ${missing.join(', ')}`);\n}\n\n// Return validated config\nreturn [{\n  tiktokNiche: requiredVars.TIKTOK_NICHE,\n  tiktokScraperApiUrl: requiredVars.TIKTOK_SCRAPER_API_URL,\n  supabaseUrl: requiredVars.SUPABASE_URL,\n  supabaseServiceKey: requiredVars.SUPABASE_SERVICE_ROLE_KEY,\n  defaultUserId: requiredVars.DEFAULT_USER_ID\n}];",
-        "jsFunction": "return await $input.all();"
-      },
-      "id": "env-validation",
-      "name": "Environment Validation",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [220, 0],
-      "onError": "stopWorkflow"
-    },
-    {
-      "parameters": {
         "assignments": {
           "assignments": [
             {
-              "id": "id-1",
+              "id": "cfg-1",
               "name": "tiktokNiche",
-              "value": "={{ $json.tiktokNiche }}",
+              "value": "mental health",
               "type": "string"
             },
             {
-              "id": "id-2",
+              "id": "cfg-2",
               "name": "tiktokScraperApiUrl",
-              "value": "={{ $json.tiktokScraperApiUrl }}",
+              "value": "YOUR_TIKTOK_SCRAPER_API_URL",
               "type": "string"
             },
             {
-              "id": "id-3",
+              "id": "cfg-3",
               "name": "supabaseUrl",
-              "value": "={{ $json.supabaseUrl }}",
+              "value": "YOUR_SUPABASE_URL",
               "type": "string"
             },
             {
-              "id": "id-4",
+              "id": "cfg-4",
               "name": "supabaseServiceKey",
-              "value": "={{ $json.supabaseServiceKey }}",
+              "value": "YOUR_SUPABASE_SERVICE_ROLE_KEY",
               "type": "string"
             },
             {
-              "id": "id-5",
+              "id": "cfg-5",
               "name": "defaultUserId",
-              "value": "={{ $json.defaultUserId }}",
+              "value": "system-user",
+              "type": "string"
+            },
+            {
+              "id": "cfg-6",
+              "name": "commentRateThreshold",
+              "value": 0.008,
+              "type": "number"
+            },
+            {
+              "id": "cfg-7",
+              "name": "playCountThreshold",
+              "value": 100000,
+              "type": "number"
+            },
+            {
+              "id": "cfg-8",
+              "name": "shareCountThreshold",
+              "value": 500,
+              "type": "number"
+            },
+            {
+              "id": "cfg-9",
+              "name": "confidenceThreshold",
+              "value": 0.65,
+              "type": "number"
+            },
+            {
+              "id": "cfg-10",
+              "name": "startTime",
+              "value": "={{ $now.toISO() }}",
               "type": "string"
             }
           ]
         },
-        "includeOtherFields": true,
         "options": {}
       },
       "id": "workflow-config",
       "name": "Workflow Configuration",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [440, 0]
+      "position": [220, 0]
     },
     {
       "parameters": {
@@ -83,10 +100,6 @@
             {
               "name": "apikey",
               "value": "={{ $json.supabaseServiceKey }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $json.supabaseServiceKey }}"
             }
           ]
         },
@@ -96,7 +109,8 @@
       "name": "Fetch Brand Config",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [660, 0]
+      "position": [440, 0],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -105,7 +119,7 @@
             {
               "id": "id-brand",
               "name": "brandConfig",
-              "value": "={{ $json[0] }}",
+              "value": "={{ $json[0] || {} }}",
               "type": "object"
             }
           ]
@@ -117,7 +131,7 @@
       "name": "Set Brand Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [880, 0]
+      "position": [660, 0]
     },
     {
       "parameters": {
@@ -141,7 +155,7 @@
             },
             {
               "name": "count",
-              "value": "10"
+              "value": "15"
             },
             {
               "name": "sort",
@@ -155,7 +169,8 @@
       "name": "Scrape TikTok Viral Videos",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [1100, 0]
+      "position": [880, 0],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -166,106 +181,18 @@
       "name": "Split Videos for Processing",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
+      "position": [1100, 0]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Normalize fields and compute derived values\nconst item = $input.item.json;\nconst config = $('Workflow Configuration').first().json;\n\n// Extract raw values (treat missing as 0)\nconst text = item.text || item.description || item.caption || '';\nconst playCount = Number(item.playCount || item.viewCount || 0);\nconst commentCount = Number(item.commentCount || 0);\nconst shareCount = Number(item.shareCount || 0);\nconst durationSeconds = Number(item.durationSeconds || item.duration || 0);\nconst author = item.author || item.handle || null;\nconst videoUrl = item.videoUrl || item.url || '';\nconst videoId = item.videoId || videoUrl.split('/').pop() || '';\n\n// Compute derived values\nconst hookText = text.substring(0, 120).trim();\nconst commentRate = playCount > 0 ? commentCount / playCount : 0;\n\n// Compute viral filter result\nconst passesViralFilter = (\n  commentRate >= config.commentRateThreshold ||\n  playCount >= config.playCountThreshold ||\n  shareCount >= config.shareCountThreshold\n);\n\n// Build filterReason\nlet filterReason = '';\nif (passesViralFilter) {\n  const reasons = [];\n  if (commentRate >= config.commentRateThreshold) reasons.push(`commentRate=${(commentRate * 100).toFixed(2)}%`);\n  if (playCount >= config.playCountThreshold) reasons.push(`playCount=${playCount}`);\n  if (shareCount >= config.shareCountThreshold) reasons.push(`shareCount=${shareCount}`);\n  filterReason = 'PASSED: ' + reasons.join(', ');\n} else {\n  filterReason = `FAILED: commentRate=${(commentRate * 100).toFixed(2)}% (<0.8%), playCount=${playCount} (<100k), shareCount=${shareCount} (<500)`;\n}\n\nreturn {\n  // Original fields\n  text,\n  playCount,\n  commentCount,\n  shareCount,\n  durationSeconds,\n  author,\n  videoUrl,\n  videoId,\n  \n  // Derived fields\n  hookText,\n  commentRate,\n  \n  // Filter result\n  passesViralFilter,\n  filterReason,\n  \n  // Pass through config\n  config,\n  brandConfig: $('Set Brand Config').first().json.brandConfig\n};"
+      },
+      "id": "normalize-fields",
+      "name": "Normalize Fields & Compute",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [1320, 0]
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "id-1",
-              "name": "videoUrl",
-              "value": "={{ $json.videoUrl }}",
-              "type": "string"
-            },
-            {
-              "id": "id-2",
-              "name": "videoDescription",
-              "value": "={{ $json.description }}",
-              "type": "string"
-            },
-            {
-              "id": "id-3",
-              "name": "videoViews",
-              "value": "={{ $json.viewCount }}",
-              "type": "number"
-            },
-            {
-              "id": "id-4",
-              "name": "videoLikes",
-              "value": "={{ $json.likeCount }}",
-              "type": "number"
-            },
-            {
-              "id": "id-5",
-              "name": "videoShares",
-              "value": "={{ $json.shareCount || 0 }}",
-              "type": "number"
-            },
-            {
-              "id": "id-6",
-              "name": "videoComments",
-              "value": "={{ $json.commentCount || 0 }}",
-              "type": "number"
-            },
-            {
-              "id": "id-7",
-              "name": "videoDuration",
-              "value": "={{ $json.duration || 0 }}",
-              "type": "number"
-            },
-            {
-              "id": "id-8",
-              "name": "sourceHash",
-              "value": "={{ $json.videoId || $json.videoUrl.split('/').pop() }}",
-              "type": "string"
-            },
-            {
-              "id": "id-9",
-              "name": "brandConfig",
-              "value": "={{ $('Set Brand Config').first().json.brandConfig }}",
-              "type": "object"
-            },
-            {
-              "id": "id-10",
-              "name": "workflowConfig",
-              "value": "={{ $('Workflow Configuration').first().json }}",
-              "type": "object"
-            }
-          ]
-        },
-        "includeOtherFields": true,
-        "options": {}
-      },
-      "id": "extract-data",
-      "name": "Extract Video Data",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [1540, 0]
-    },
-    {
-      "parameters": {
-        "url": "={{ $json.workflowConfig.supabaseUrl }}/rest/v1/scripts?source_hash=eq.{{ $json.sourceHash }}&select=id,source_hash",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $json.workflowConfig.supabaseServiceKey }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "Bearer {{ $json.workflowConfig.supabaseServiceKey }}"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "check-duplicate",
-      "name": "Check for Duplicate Script",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [1760, 0]
     },
     {
       "parameters": {
@@ -277,6 +204,89 @@
           },
           "conditions": [
             {
+              "id": "viral-filter",
+              "leftValue": "={{ $json.passesViralFilter }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "viral-signal-filter",
+      "name": "Viral Signal Filter",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1540, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "skip-1",
+              "name": "skipped",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "skip-2",
+              "name": "reason",
+              "value": "={{ $json.filterReason }}",
+              "type": "string"
+            },
+            {
+              "id": "skip-3",
+              "name": "hookText",
+              "value": "={{ $json.hookText }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-filter-skip",
+      "name": "Log Filter Skip",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1760, 200]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.config.supabaseUrl }}/rest/v1/scripts?source_hash=eq.{{ $json.videoId }}&select=id,source_hash",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $json.config.supabaseServiceKey }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check-duplicate",
+      "name": "Check for Duplicate Script",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1760, 0],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "dup-check",
               "leftValue": "={{ $json.length }}",
               "rightValue": 0,
               "operator": {
@@ -297,13 +307,39 @@
     },
     {
       "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dup-1",
+              "name": "skipped",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "dup-2",
+              "name": "reason",
+              "value": "Duplicate video already processed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-duplicate-skip",
+      "name": "Log Duplicate Skip",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2200, 200]
+    },
+    {
+      "parameters": {
         "amount": 2,
         "unit": "seconds"
       },
-      "id": "wait-rate-limit-1",
-      "name": "Rate Limit - Analysis",
+      "id": "rate-limit-1",
+      "name": "Rate Limit - Classification",
       "type": "n8n-nodes-base.wait",
-      "typeVersion": 1,
+      "typeVersion": 1.1,
       "position": [2200, 0]
     },
     {
@@ -311,20 +347,20 @@
         "modelId": {
           "__rl": true,
           "mode": "id",
-          "value": "models/gemini-1.5-pro"
+          "value": "models/gemini-1.5-flash"
         },
         "messages": {
           "values": [
             {
-              "content": "Analyze why this TikTok went viral:\\n\\nURL: {{ $('Extract Video Data').first().json.videoUrl }}\\nDescription: {{ $('Extract Video Data').first().json.videoDescription }}\\nViews: {{ $('Extract Video Data').first().json.videoViews }}\\nLikes: {{ $('Extract Video Data').first().json.videoLikes }}\\nShares: {{ $('Extract Video Data').first().json.videoShares }}\\nComments: {{ $('Extract Video Data').first().json.videoComments }}\\n\\nReturn JSON with:\\n- hook: Opening hook strategy\\n- structure: Video pacing and flow\\n- triggers: Emotional/psychological triggers\\n- audience: Target demographic"
+              "content": "=Classify this TikTok hook into ONE bucket: EMOTIONAL_STORY, PARENT_IDENTITY_MIRROR, INNER_CHILD_REFLECTION, SOFT_AUTHORITY, or REJECT.\nREJECT if it is list-based, instructional, clinical, or uses therapist-authority framing.\nReturn JSON only: {\"bucket\":\"...\",\"confidence\":0-1,\"rationale\":\"...\"}\nHook: {{ $('Normalize Fields & Compute').first().json.hookText }}\nDuration: {{ $('Normalize Fields & Compute').first().json.durationSeconds }}\nMetrics: plays={{ $('Normalize Fields & Compute').first().json.playCount }} comments={{ $('Normalize Fields & Compute').first().json.commentCount }} shares={{ $('Normalize Fields & Compute').first().json.shareCount }} commentRate={{ ($('Normalize Fields & Compute').first().json.commentRate * 100).toFixed(2) }}%"
             }
           ]
         },
         "jsonOutput": true,
         "options": {}
       },
-      "id": "analyze-gemini",
-      "name": "Analyze Video with Gemini",
+      "id": "bucket-classification",
+      "name": "Bucket Classification",
       "type": "@n8n/n8n-nodes-langchain.googleGemini",
       "typeVersion": 1.1,
       "position": [2420, 0],
@@ -332,211 +368,335 @@
     },
     {
       "parameters": {
-        "modelId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "models/gemini-1.5-pro"
-        },
-        "messages": {
-          "values": [
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
             {
-              "content": "={{ 'Classify this video content into one of these content pillars based on the analysis:\\n\\nAvailable pillars: ' + JSON.stringify($('Extract Video Data').first().json.brandConfig.content_pillars) + '\\n\\nVideo Analysis: ' + JSON.stringify($json) + '\\n\\nRespond with a JSON object:\\n{\\n  \"pillar\": \"<pillar_name>\",\\n  \"confidence\": <0.0-1.0>,\\n  \"reasoning\": \"<why this pillar fits>\"\\n}' }}"
+              "id": "not-reject",
+              "leftValue": "={{ $json.bucket }}",
+              "rightValue": "REJECT",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            },
+            {
+              "id": "confidence-ok",
+              "leftValue": "={{ $json.confidence }}",
+              "rightValue": "={{ $('Workflow Configuration').first().json.confidenceThreshold }}",
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
             }
-          ]
+          ],
+          "combinator": "and"
         },
-        "jsonOutput": true,
         "options": {}
       },
-      "id": "classify-pillar",
-      "name": "Classify Content Pillar",
-      "type": "@n8n/n8n-nodes-langchain.googleGemini",
-      "typeVersion": 1.1,
-      "position": [1540, 0]
-    },
-    {
-      "parameters": {
-        "modelId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "models/gemini-1.5-pro"
-        },
-        "messages": {
-          "values": [
-            {
-              "content": "={{ 'Based on this video analysis, create a compelling 30-60 second script for the ' + $('Workflow Configuration').first().json.tiktokNiche + ' niche.\\n\\n=== BRAND VOICE GUIDELINES ===\\n' + 'Voice: ' + ($('Extract Video Data').first().json.brandConfig.voice_description || 'Professional and engaging') + '\\n' + 'Target Audience: ' + ($('Extract Video Data').first().json.brandConfig.target_audience || 'General audience') + '\\n' + 'Required CTA: ' + ($('Extract Video Data').first().json.brandConfig.required_cta || 'Follow for more!') + '\\n' + 'Unique Angles: ' + JSON.stringify($('Extract Video Data').first().json.brandConfig.unique_angles || []) + '\\n' + 'BANNED PHRASES (never use): ' + JSON.stringify($('Extract Video Data').first().json.brandConfig.banned_phrases || []) + '\\n\\n=== VIDEO ANALYSIS ===\\n' + JSON.stringify($('Analyze Video with Gemini').first().json) + '\\n\\n=== CONTENT PILLAR ===\\n' + $('Classify Content Pillar').first().json.pillar + '\\n\\nCreate a JSON response with these exact fields:\\n- spoken_script: The full script text to be spoken by the avatar (MUST match brand voice, include required CTA at end)\\n- caption: A catchy caption for the post (max 150 chars)\\n- hashtags: Array of 5-10 relevant hashtags without # symbol\\n- on_screen_text: Array of text overlays to show during the video\\n- music_track: Suggested music style or track name\\n- hook: The opening hook line (first 3 seconds)\\n\\nMake sure the script:\\n1. Uses a similar hook strategy to grab attention immediately\\n2. Follows a proven structure that keeps viewers engaged\\n3. Matches the brand voice guidelines EXACTLY\\n4. Is 30-60 seconds when spoken at normal pace\\n5. Ends with the required CTA\\n6. NEVER uses any banned phrases' }}"
-            }
-          ]
-        },
-        "jsonOutput": true,
-        "options": {}
-      },
-      "id": "generate-script",
-      "name": "Generate Script with Gemini",
-      "type": "@n8n/n8n-nodes-langchain.googleGemini",
-      "typeVersion": 1.1,
-      "position": [1760, 0]
-    },
-    {
-      "parameters": {
-        "modelId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "models/gemini-1.5-pro"
-        },
-        "messages": {
-          "values": [
-            {
-              "content": "={{ 'Generate 2 alternative hook variants for this script. The hooks should be different styles but equally attention-grabbing.\\n\\nOriginal Script: ' + JSON.stringify($json) + '\\n\\nOriginal Hook: ' + $json.hook + '\\n\\nProvide a JSON array with exactly 3 hooks (including the original):\\n[\\n  {\"hook\": \"<original hook>\", \"style\": \"original\"},\\n  {\"hook\": \"<question-based hook>\", \"style\": \"question\"},\\n  {\"hook\": \"<shocking/contrarian hook>\", \"style\": \"contrarian\"}\\n]' }}"
-            }
-          ]
-        },
-        "jsonOutput": true,
-        "options": {}
-      },
-      "id": "generate-hook-variants",
-      "name": "Generate Hook Variants",
-      "type": "@n8n/n8n-nodes-langchain.googleGemini",
-      "typeVersion": 1.1,
-      "position": [1980, 0]
-    },
-    {
-      "parameters": {
-        "modelId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "models/gemini-1.5-pro"
-        },
-        "messages": {
-          "values": [
-            {
-              "content": "={{ 'Score this script on a scale of 1-10 for viral potential. Be strict - only high-quality scripts should score above 6.\\n\\n=== SCRIPT ===\\n' + JSON.stringify($('Generate Script with Gemini').first().json) + '\\n\\n=== BRAND GUIDELINES ===\\n' + 'Voice: ' + ($('Extract Video Data').first().json.brandConfig.voice_description || 'N/A') + '\\n' + 'Target: ' + ($('Extract Video Data').first().json.brandConfig.target_audience || 'N/A') + '\\n\\n=== SCORING CRITERIA ===\\n1. Hook strength (does it stop the scroll?)\\n2. Brand voice alignment\\n3. Content value (is it useful/entertaining?)\\n4. Call-to-action clarity\\n5. Originality (not too derivative)\\n6. Emotional resonance\\n\\nRespond with JSON:\\n{\\n  \"quality_score\": <1-10>,\\n  \"strengths\": [\"<strength1>\", \"<strength2>\"],\\n  \"weaknesses\": [\"<weakness1>\"],\\n  \"auto_reject\": <true if score < 6>,\\n  \"improvement_suggestions\": [\"<suggestion1>\"]\\n}' }}"
-            }
-          ]
-        },
-        "jsonOutput": true,
-        "options": {}
-      },
-      "id": "score-quality",
-      "name": "Score Script Quality",
-      "type": "@n8n/n8n-nodes-langchain.googleGemini",
-      "typeVersion": 1.1,
-      "position": [2200, 0]
-    },
-    {
-      "parameters": {
-        "modelId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "models/gemini-1.5-pro"
-        },
-        "messages": {
-          "values": [
-            {
-              "content": "={{ 'Generate platform-specific captions for this script. Each platform has different tone requirements.\\n\\n=== SCRIPT ===\\nCaption: ' + $('Generate Script with Gemini').first().json.caption + '\\nHashtags: ' + JSON.stringify($('Generate Script with Gemini').first().json.hashtags) + '\\n\\n=== PLATFORM GUIDELINES ===\\n' + JSON.stringify($('Extract Video Data').first().json.brandConfig.platform_guidelines || {}) + '\\n\\nGenerate a JSON object with platform-specific captions:\\n{\\n  \"tiktok\": \"<casual caption with emojis, max 150 chars>\",\\n  \"instagram\": \"<slightly polished caption, max 200 chars>\",\\n  \"youtube\": \"<professional caption with channel CTA>\"\\n}\\n\\nInclude relevant hashtags in each caption.' }}"
-            }
-          ]
-        },
-        "jsonOutput": true,
-        "options": {}
-      },
-      "id": "generate-platform-captions",
-      "name": "Generate Platform Captions",
-      "type": "@n8n/n8n-nodes-langchain.googleGemini",
-      "typeVersion": 1.1,
-      "position": [2420, 0]
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "id-1",
-              "name": "script_json",
-              "value": "={{ $('Generate Script with Gemini').first().json }}",
-              "type": "object"
-            },
-            {
-              "id": "id-2",
-              "name": "analysis_json",
-              "value": "={{ $('Analyze Video with Gemini').first().json }}",
-              "type": "object"
-            },
-            {
-              "id": "id-3",
-              "name": "source_video_url",
-              "value": "={{ $('Extract Video Data').first().json.videoUrl }}",
-              "type": "string"
-            },
-            {
-              "id": "id-4",
-              "name": "source_hash",
-              "value": "={{ $('Extract Video Data').first().json.sourceHash }}",
-              "type": "string"
-            },
-            {
-              "id": "id-5",
-              "name": "caption",
-              "value": "={{ $('Generate Script with Gemini').first().json.caption }}",
-              "type": "string"
-            },
-            {
-              "id": "id-6",
-              "name": "hashtags",
-              "value": "={{ $('Generate Script with Gemini').first().json.hashtags }}",
-              "type": "object"
-            },
-            {
-              "id": "id-7",
-              "name": "music_track",
-              "value": "={{ $('Generate Script with Gemini').first().json.music_track }}",
-              "type": "string"
-            },
-            {
-              "id": "id-8",
-              "name": "pillar",
-              "value": "={{ $('Classify Content Pillar').first().json.pillar }}",
-              "type": "string"
-            },
-            {
-              "id": "id-9",
-              "name": "quality_score",
-              "value": "={{ $('Score Script Quality').first().json.quality_score }}",
-              "type": "number"
-            },
-            {
-              "id": "id-10",
-              "name": "auto_reject",
-              "value": "={{ $('Score Script Quality').first().json.auto_reject || false }}",
-              "type": "boolean"
-            },
-            {
-              "id": "id-11",
-              "name": "hook_variants",
-              "value": "={{ $('Generate Hook Variants').first().json }}",
-              "type": "object"
-            },
-            {
-              "id": "id-12",
-              "name": "platform_captions",
-              "value": "={{ $json }}",
-              "type": "object"
-            },
-            {
-              "id": "id-13",
-              "name": "source_metrics",
-              "value": "={{ { views: $('Extract Video Data').first().json.videoViews, likes: $('Extract Video Data').first().json.videoLikes, captured_at: $now.toISO() } }}",
-              "type": "object"
-            }
-          ]
-        },
-        "includeOtherFields": true,
-        "options": {}
-      },
-      "id": "prepare-insert",
-      "name": "Prepare Script Data for Insert",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "id": "bucket-confidence-gate",
+      "name": "Bucket Confidence Gate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
       "position": [2640, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Workflow Configuration').first().json.supabaseUrl }}/rest/v1/manual_review_queue",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"source_video_url\": \"{{ $('Normalize Fields & Compute').first().json.videoUrl }}\",\n  \"hook_text\": \"{{ $('Normalize Fields & Compute').first().json.hookText }}\",\n  \"bucket\": \"{{ $json.bucket }}\",\n  \"confidence\": {{ $json.confidence }},\n  \"rationale\": \"{{ $json.rationale }}\",\n  \"rejection_reason\": \"bucket={{ $json.bucket }}, confidence={{ $json.confidence }}\",\n  \"stage\": \"bucket_classification\",\n  \"created_at\": \"{{ $('Workflow Configuration').first().json.startTime }}\"\n}",
+        "options": {}
+      },
+      "id": "manual-review-bucket",
+      "name": "Send to Manual Review (Bucket)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2860, 200],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "id": "rate-limit-2",
+      "name": "Rate Limit - Script Gen",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2860, 0]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "models/gemini-1.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Write Safe Harbor scripts that preserve the emotional spine but do NOT diagnose, give treatment advice, or promise outcomes.\nTone: warm, calm, reflective. Parent-friendly. No \"you should\" advice.\nStructure: Hook (0-3s) → Validation (3-7s, remove shame) → Body-first Reframe (7-15s, nervous-system framing) → Soft close (curiosity, NO hard CTA).\n\nFORBIDDEN WORDS (never use): diagnose, diagnosis, disorder, symptoms, treatment, cure, guarantee, \"you should\", \"here's how to fix\", outcome promises.\n\nReturn JSON only with these exact keys:\n- script_15s: target 8-20 seconds spoken\n- script_30s: longer version\n- caption_tiktok: casual, max 150 chars\n- caption_instagram: slightly polished, max 200 chars  \n- facebook_post: warm, parent-friendly tone\n- pinned_comment: question to spark comments\n- hashtags: array of 5-9 hashtags without # symbol\n- hookText_safeharbor: rewritten hook preserving emotional spine\n\nSource hook: {{ $('Normalize Fields & Compute').first().json.hookText }}\nBucket: {{ $('Bucket Classification').first().json.bucket }}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {}
+      },
+      "id": "safeharbor-script-gen",
+      "name": "Safe Harbor Script Generation",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [3080, 0],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Rule-based compliance lint\nconst script = $input.item.json;\nconst script15s = script.script_15s || '';\nconst script30s = script.script_30s || '';\nconst allText = (script15s + ' ' + script30s).toLowerCase();\n\n// Forbidden words and phrases\nconst forbiddenWords = [\n  'diagnose', 'diagnosis', 'disorder', 'symptoms', \n  'treatment', 'cure', 'guarantee'\n];\n\nconst forbiddenPhrases = [\n  'you should', \"here's how to fix\", 'here is how to fix',\n  'will cure', 'will fix', 'will heal', 'guaranteed to',\n  'promise you', 'i promise'\n];\n\nconst reasons = [];\n\n// Check forbidden words\nfor (const word of forbiddenWords) {\n  if (allText.includes(word)) {\n    reasons.push(`Contains forbidden word: \"${word}\"`);\n  }\n}\n\n// Check forbidden phrases\nfor (const phrase of forbiddenPhrases) {\n  if (allText.includes(phrase)) {\n    reasons.push(`Contains forbidden phrase: \"${phrase}\"`);\n  }\n}\n\n// Check for outcome promises (patterns)\nconst outcomePatterns = [\n  /will make you feel/i,\n  /will help you overcome/i,\n  /will change your life/i,\n  /guaranteed results/i\n];\n\nfor (const pattern of outcomePatterns) {\n  if (pattern.test(allText)) {\n    reasons.push(`Contains outcome promise pattern`);\n  }\n}\n\nconst result = reasons.length === 0 ? 'PASS' : 'FAIL';\n\nreturn {\n  ...script,\n  ruleLintResult: result,\n  ruleLintReasons: reasons,\n  needsLLMBackstop: true\n};"
+      },
+      "id": "rule-compliance-lint",
+      "name": "Rule-Based Compliance Lint",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3300, 0]
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "id": "rate-limit-3",
+      "name": "Rate Limit - Compliance",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [3520, 0]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "models/gemini-1.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Check this script for diagnosis, medical advice, treatment claims, or promised outcomes, and for forbidden phrases (\"you should\", \"fix\", \"guarantee\", etc).\nReturn JSON only: {\"result\":\"PASS\"|\"FAIL\",\"reasons\":[\"...\"]}\nScript: {{ $('Safe Harbor Script Generation').first().json.script_15s }}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {}
+      },
+      "id": "llm-compliance-backstop",
+      "name": "LLM Compliance Backstop",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [3740, 0],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Combine rule-based and LLM compliance results\nconst ruleLint = $('Rule-Based Compliance Lint').first().json;\nconst llmLint = $input.item.json;\n\nconst ruleResult = ruleLint.ruleLintResult;\nconst llmResult = llmLint.result;\n\n// Both must pass for overall PASS\nconst overallResult = (ruleResult === 'PASS' && llmResult === 'PASS') ? 'PASS' : 'FAIL';\n\n// Combine reasons\nconst allReasons = [\n  ...(ruleLint.ruleLintReasons || []),\n  ...(llmLint.reasons || [])\n];\n\nreturn {\n  ...ruleLint,\n  llmLintResult: llmResult,\n  llmLintReasons: llmLint.reasons || [],\n  complianceResult: overallResult,\n  complianceReasons: allReasons,\n  retryCount: 0\n};"
+      },
+      "id": "combine-compliance",
+      "name": "Combine Compliance Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3960, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "compliance-pass",
+              "leftValue": "={{ $json.complianceResult }}",
+              "rightValue": "PASS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "compliance-gate",
+      "name": "Compliance Gate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [4180, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "retry-check",
+              "leftValue": "={{ $json.retryCount }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "retry-gate",
+      "name": "Retry Gate (First Fail)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [4400, 200]
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "id": "rate-limit-retry",
+      "name": "Rate Limit - Retry",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [4620, 100]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "models/gemini-1.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=STRICT REWRITE REQUIRED. The previous script failed compliance.\n\nFailure reasons: {{ JSON.stringify($('Combine Compliance Results').first().json.complianceReasons) }}\n\nRewrite this script with EXTRA CAUTION:\n- Absolutely NO diagnosis, medical advice, treatment claims, or promised outcomes\n- NO forbidden phrases: \"you should\", \"fix\", \"guarantee\", \"cure\", \"treatment\"\n- Keep it warm, calm, reflective, parent-friendly\n- Structure: Hook → Validation → Body-first Reframe → Soft close (curiosity only)\n\nReturn JSON only with these exact keys:\nscript_15s, script_30s, caption_tiktok, caption_instagram, facebook_post, pinned_comment, hashtags, hookText_safeharbor\n\nOriginal hook: {{ $('Normalize Fields & Compute').first().json.hookText }}\nBucket: {{ $('Bucket Classification').first().json.bucket }}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {}
+      },
+      "id": "strict-regenerate",
+      "name": "Strict Regenerate Script",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [4840, 100],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Re-run rule-based compliance on regenerated script\nconst script = $input.item.json;\nconst script15s = script.script_15s || '';\nconst script30s = script.script_30s || '';\nconst allText = (script15s + ' ' + script30s).toLowerCase();\n\nconst forbiddenWords = [\n  'diagnose', 'diagnosis', 'disorder', 'symptoms', \n  'treatment', 'cure', 'guarantee'\n];\n\nconst forbiddenPhrases = [\n  'you should', \"here's how to fix\", 'here is how to fix',\n  'will cure', 'will fix', 'will heal', 'guaranteed to',\n  'promise you', 'i promise'\n];\n\nconst reasons = [];\n\nfor (const word of forbiddenWords) {\n  if (allText.includes(word)) {\n    reasons.push(`Contains forbidden word: \"${word}\"`);\n  }\n}\n\nfor (const phrase of forbiddenPhrases) {\n  if (allText.includes(phrase)) {\n    reasons.push(`Contains forbidden phrase: \"${phrase}\"`);\n  }\n}\n\nconst result = reasons.length === 0 ? 'PASS' : 'FAIL';\n\nreturn {\n  ...script,\n  complianceResult: result,\n  complianceReasons: reasons,\n  retryCount: 1,\n  isRetry: true\n};"
+      },
+      "id": "retry-compliance-check",
+      "name": "Retry Compliance Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [5060, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "retry-pass",
+              "leftValue": "={{ $json.complianceResult }}",
+              "rightValue": "PASS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "retry-compliance-gate",
+      "name": "Retry Compliance Gate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [5280, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Workflow Configuration').first().json.supabaseUrl }}/rest/v1/manual_review_queue",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"source_video_url\": \"{{ $('Normalize Fields & Compute').first().json.videoUrl }}\",\n  \"hook_text\": \"{{ $('Normalize Fields & Compute').first().json.hookText }}\",\n  \"bucket\": \"{{ $('Bucket Classification').first().json.bucket }}\",\n  \"script_15s\": {{ JSON.stringify($json.script_15s || '') }},\n  \"compliance_reasons\": {{ JSON.stringify($json.complianceReasons || []) }},\n  \"rejection_reason\": \"Compliance failed after retry\",\n  \"stage\": \"compliance\",\n  \"retry_count\": {{ $json.retryCount || 1 }},\n  \"created_at\": \"{{ $('Workflow Configuration').first().json.startTime }}\"\n}",
+        "options": {}
+      },
+      "id": "manual-review-compliance",
+      "name": "Send to Manual Review (Compliance)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [5500, 300],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Prepare final VideoJob data for Supabase insert\nconst normalized = $('Normalize Fields & Compute').first().json;\nconst bucket = $('Bucket Classification').first().json;\nconst config = $('Workflow Configuration').first().json;\n\n// Get script data - could be from first pass or retry\nlet scriptData = $input.item.json;\nif (!scriptData.script_15s) {\n  scriptData = $('Safe Harbor Script Generation').first().json;\n}\n\nreturn {\n  // User and status\n  user_id: config.defaultUserId,\n  status: 'Pending Script',\n  processed: false,\n  \n  // Source info\n  source_video_url: normalized.videoUrl,\n  source_hash: normalized.videoId,\n  \n  // Bucket classification\n  bucket: bucket.bucket,\n  bucket_confidence: bucket.confidence,\n  bucket_rationale: bucket.rationale,\n  \n  // Hook text\n  hookText_original: normalized.hookText,\n  hookText_safeharbor: scriptData.hookText_safeharbor || '',\n  \n  // Scripts\n  script_15s: scriptData.script_15s || '',\n  script_30s: scriptData.script_30s || '',\n  \n  // Captions and social\n  caption_tiktok: scriptData.caption_tiktok || '',\n  caption_instagram: scriptData.caption_instagram || '',\n  facebook_post: scriptData.facebook_post || '',\n  pinned_comment: scriptData.pinned_comment || '',\n  hashtags: scriptData.hashtags || [],\n  \n  // For backwards compatibility with existing UI\n  caption: scriptData.caption_tiktok || '',\n  script_json: {\n    spoken_script: scriptData.script_15s || '',\n    script_15s: scriptData.script_15s || '',\n    script_30s: scriptData.script_30s || '',\n    hook: normalized.hookText\n  },\n  \n  // Metrics\n  source_metrics: {\n    playCount: normalized.playCount,\n    commentCount: normalized.commentCount,\n    shareCount: normalized.shareCount,\n    commentRate: normalized.commentRate,\n    durationSeconds: normalized.durationSeconds,\n    captured_at: config.startTime\n  },\n  \n  // Filter and compliance logs\n  filter_reason: normalized.filterReason,\n  compliance_result: scriptData.complianceResult || 'PASS',\n  compliance_reasons: scriptData.complianceReasons || [],\n  is_retry: scriptData.isRetry || false\n};"
+      },
+      "id": "prepare-videojob",
+      "name": "Prepare VideoJob Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4400, 0]
     },
     {
       "parameters": {
@@ -550,8 +710,48 @@
               "value": "={{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
             },
             {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "insert-supabase",
+      "name": "Insert Script to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [4620, 0],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Prepare retry script for insertion\nconst normalized = $('Normalize Fields & Compute').first().json;\nconst bucket = $('Bucket Classification').first().json;\nconst config = $('Workflow Configuration').first().json;\nconst scriptData = $input.item.json;\n\nreturn {\n  user_id: config.defaultUserId,\n  status: 'Pending Script',\n  processed: false,\n  source_video_url: normalized.videoUrl,\n  source_hash: normalized.videoId,\n  bucket: bucket.bucket,\n  bucket_confidence: bucket.confidence,\n  bucket_rationale: bucket.rationale,\n  hookText_original: normalized.hookText,\n  hookText_safeharbor: scriptData.hookText_safeharbor || '',\n  script_15s: scriptData.script_15s || '',\n  script_30s: scriptData.script_30s || '',\n  caption_tiktok: scriptData.caption_tiktok || '',\n  caption_instagram: scriptData.caption_instagram || '',\n  facebook_post: scriptData.facebook_post || '',\n  pinned_comment: scriptData.pinned_comment || '',\n  hashtags: scriptData.hashtags || [],\n  caption: scriptData.caption_tiktok || '',\n  script_json: {\n    spoken_script: scriptData.script_15s || '',\n    script_15s: scriptData.script_15s || '',\n    script_30s: scriptData.script_30s || '',\n    hook: normalized.hookText\n  },\n  source_metrics: {\n    playCount: normalized.playCount,\n    commentCount: normalized.commentCount,\n    shareCount: normalized.shareCount,\n    commentRate: normalized.commentRate,\n    durationSeconds: normalized.durationSeconds,\n    captured_at: config.startTime\n  },\n  filter_reason: normalized.filterReason,\n  compliance_result: 'PASS',\n  compliance_reasons: [],\n  is_retry: true\n};"
+      },
+      "id": "prepare-retry-videojob",
+      "name": "Prepare Retry VideoJob",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [5500, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Workflow Configuration').first().json.supabaseUrl }}/rest/v1/scripts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
             },
             {
               "name": "Content-Type",
@@ -565,21 +765,19 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"status\": \"Pending Script\",\n  \"processed\": false,\n  \"source_video_url\": \"{{ $json.source_video_url }}\",\n  \"source_hash\": \"{{ $json.source_hash }}\",\n  \"analysis_json\": {{ JSON.stringify($json.analysis_json) }},\n  \"script_json\": {{ JSON.stringify($json.script_json) }},\n  \"caption\": \"{{ $json.caption }}\",\n  \"hashtags\": {{ JSON.stringify($json.hashtags) }},\n  \"music_track\": \"{{ $json.music_track }}\",\n  \"pillar\": \"{{ $json.pillar }}\",\n  \"quality_score\": {{ $json.quality_score }},\n  \"auto_reject\": {{ $json.auto_reject }},\n  \"hook_variants\": {{ JSON.stringify($json.hook_variants) }},\n  \"platform_captions\": {{ JSON.stringify($json.platform_captions) }},\n  \"source_metrics\": {{ JSON.stringify($json.source_metrics) }}\n}",
+        "jsonBody": "={{ JSON.stringify($json) }}",
         "options": {}
       },
-      "id": "insert-supabase",
-      "name": "Insert Script to Supabase",
+      "id": "insert-retry-supabase",
+      "name": "Insert Retry Script to Supabase",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [2860, 0]
+      "position": [5720, 0],
+      "onError": "continueErrorOutput"
     }
   ],
   "connections": {
     "Daily TikTok Scraper Schedule": {
-      "main": [[{"node": "Environment Validation", "type": "main", "index": 0}]]
-    },
-    "Environment Validation": {
       "main": [[{"node": "Workflow Configuration", "type": "main", "index": 0}]]
     },
     "Workflow Configuration": {
@@ -592,41 +790,101 @@
       "main": [[{"node": "Scrape TikTok Viral Videos", "type": "main", "index": 0}]]
     },
     "Scrape TikTok Viral Videos": {
-      "main": [[{"node": "Extract Video Data", "type": "main", "index": 0}]]
+      "main": [[{"node": "Split Videos for Processing", "type": "main", "index": 0}]]
     },
-    "Extract Video Data": {
-      "main": [[{"node": "Analyze Video with Gemini", "type": "main", "index": 0}]]
+    "Split Videos for Processing": {
+      "main": [[{"node": "Normalize Fields & Compute", "type": "main", "index": 0}]]
     },
-    "Analyze Video with Gemini": {
-      "main": [[{"node": "Classify Content Pillar", "type": "main", "index": 0}]]
+    "Normalize Fields & Compute": {
+      "main": [[{"node": "Viral Signal Filter", "type": "main", "index": 0}]]
     },
-    "Classify Content Pillar": {
-      "main": [[{"node": "Generate Script with Gemini", "type": "main", "index": 0}]]
+    "Viral Signal Filter": {
+      "main": [
+        [{"node": "Check for Duplicate Script", "type": "main", "index": 0}],
+        [{"node": "Log Filter Skip", "type": "main", "index": 0}]
+      ]
     },
-    "Generate Script with Gemini": {
-      "main": [[{"node": "Generate Hook Variants", "type": "main", "index": 0}]]
+    "Check for Duplicate Script": {
+      "main": [[{"node": "If Not Duplicate", "type": "main", "index": 0}]]
     },
-    "Generate Hook Variants": {
-      "main": [[{"node": "Score Script Quality", "type": "main", "index": 0}]]
+    "If Not Duplicate": {
+      "main": [
+        [{"node": "Rate Limit - Classification", "type": "main", "index": 0}],
+        [{"node": "Log Duplicate Skip", "type": "main", "index": 0}]
+      ]
     },
-    "Score Script Quality": {
-      "main": [[{"node": "Generate Platform Captions", "type": "main", "index": 0}]]
+    "Rate Limit - Classification": {
+      "main": [[{"node": "Bucket Classification", "type": "main", "index": 0}]]
     },
-    "Generate Platform Captions": {
-      "main": [[{"node": "Prepare Script Data for Insert", "type": "main", "index": 0}]]
+    "Bucket Classification": {
+      "main": [[{"node": "Bucket Confidence Gate", "type": "main", "index": 0}]]
     },
-    "Prepare Script Data for Insert": {
+    "Bucket Confidence Gate": {
+      "main": [
+        [{"node": "Rate Limit - Script Gen", "type": "main", "index": 0}],
+        [{"node": "Send to Manual Review (Bucket)", "type": "main", "index": 0}]
+      ]
+    },
+    "Rate Limit - Script Gen": {
+      "main": [[{"node": "Safe Harbor Script Generation", "type": "main", "index": 0}]]
+    },
+    "Safe Harbor Script Generation": {
+      "main": [[{"node": "Rule-Based Compliance Lint", "type": "main", "index": 0}]]
+    },
+    "Rule-Based Compliance Lint": {
+      "main": [[{"node": "Rate Limit - Compliance", "type": "main", "index": 0}]]
+    },
+    "Rate Limit - Compliance": {
+      "main": [[{"node": "LLM Compliance Backstop", "type": "main", "index": 0}]]
+    },
+    "LLM Compliance Backstop": {
+      "main": [[{"node": "Combine Compliance Results", "type": "main", "index": 0}]]
+    },
+    "Combine Compliance Results": {
+      "main": [[{"node": "Compliance Gate", "type": "main", "index": 0}]]
+    },
+    "Compliance Gate": {
+      "main": [
+        [{"node": "Prepare VideoJob Data", "type": "main", "index": 0}],
+        [{"node": "Retry Gate (First Fail)", "type": "main", "index": 0}]
+      ]
+    },
+    "Prepare VideoJob Data": {
       "main": [[{"node": "Insert Script to Supabase", "type": "main", "index": 0}]]
+    },
+    "Retry Gate (First Fail)": {
+      "main": [
+        [{"node": "Rate Limit - Retry", "type": "main", "index": 0}],
+        [{"node": "Send to Manual Review (Compliance)", "type": "main", "index": 0}]
+      ]
+    },
+    "Rate Limit - Retry": {
+      "main": [[{"node": "Strict Regenerate Script", "type": "main", "index": 0}]]
+    },
+    "Strict Regenerate Script": {
+      "main": [[{"node": "Retry Compliance Check", "type": "main", "index": 0}]]
+    },
+    "Retry Compliance Check": {
+      "main": [[{"node": "Retry Compliance Gate", "type": "main", "index": 0}]]
+    },
+    "Retry Compliance Gate": {
+      "main": [
+        [{"node": "Prepare Retry VideoJob", "type": "main", "index": 0}],
+        [{"node": "Send to Manual Review (Compliance)", "type": "main", "index": 0}]
+      ]
+    },
+    "Prepare Retry VideoJob": {
+      "main": [[{"node": "Insert Retry Script to Supabase", "type": "main", "index": 0}]]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "wf1-v2-enhanced",
+  "versionId": "wf1-v4-safeharbor",
   "meta": {
     "instanceId": "viral-video-app"
   },
   "id": "wf1_daily_script_generator",
-  "tags": ["viral-video-app", "script-generation", "brand-voice", "quality-control"]
+  "tags": ["viral-video-app", "script-generation", "safe-harbor", "mental-health", "compliance"]
 }

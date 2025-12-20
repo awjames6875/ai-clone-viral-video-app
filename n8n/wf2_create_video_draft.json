@@ -12,7 +12,7 @@
       "name": "Webhook Trigger",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 0],
+      "position": [0, 300],
       "webhookId": "approve-script"
     },
     {
@@ -20,170 +20,93 @@
         "assignments": {
           "assignments": [
             {
-              "id": "id-1",
+              "id": "cfg-1",
               "name": "supabaseUrl",
-              "value": "={{$env.SUPABASE_URL}}",
+              "value": "https://habpialjdsyczxxkkbcj.supabase.co",
               "type": "string"
             },
             {
-              "id": "id-2",
+              "id": "cfg-2",
               "name": "supabaseServiceKey",
-              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhYnBpYWxqZHN5Y3p4eGtrYmNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjAzODYzNSwiZXhwIjoyMDgxMzk4NjM1fQ.pvv_n-IEWRFF5-5KtPMk7MetVCiCLmfbFkwdFvq4Rb8",
               "type": "string"
             },
             {
-              "id": "id-3",
+              "id": "cfg-3",
               "name": "heygenApiKey",
-              "value": "={{$env.HEYGEN_API_KEY}}",
+              "value": "sk_V2_hgu_kcWFcXGWWja_pBX4MbRCxxyS7DHusruaY50fcdSBq8zu",
               "type": "string"
             },
             {
-              "id": "id-4",
-              "name": "heygenAvatarId",
-              "value": "={{$env.HEYGEN_AVATAR_ID}}",
+              "id": "cfg-4",
+              "name": "talkingPhotoId",
+              "value": "d3882e6017e04a569868b81c6d60fab6",
               "type": "string"
             },
             {
-              "id": "id-5",
+              "id": "cfg-4b",
+              "name": "voiceId",
+              "value": "2d5b0e6cf36f460aa7fc47e3eee4ba54",
+              "type": "string"
+            },
+            {
+              "id": "cfg-5",
               "name": "scriptId",
               "value": "={{ $json.body.script_id }}",
               "type": "string"
             },
             {
-              "id": "id-6",
-              "name": "requestedByUserId",
-              "value": "={{ $json.body.requested_by_user_id }}",
-              "type": "string"
+              "id": "cfg-6",
+              "name": "maxPollingAttempts",
+              "value": 5,
+              "type": "number"
+            },
+            {
+              "id": "cfg-7",
+              "name": "pollingIntervalSeconds",
+              "value": 30,
+              "type": "number"
             }
           ]
         },
-        "includeOtherFields": true,
         "options": {}
       },
       "id": "workflow-config",
       "name": "Workflow Configuration",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [220, 0]
+      "position": [220, 300]
     },
     {
       "parameters": {
-        "method": "PATCH",
-        "url": "={{ $json.supabaseUrl }}/rest/v1/scripts?id=eq.{{ $json.scriptId }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $json.supabaseServiceKey }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $json.supabaseServiceKey }}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "Prefer",
-              "value": "return=representation"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"status\": \"Script Approved\"\n}",
-        "options": {}
-      },
-      "id": "update-status-approved",
-      "name": "Update Status to Script Approved",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [440, 0]
-    },
-    {
-      "parameters": {
-        "url": "={{ $('Workflow Configuration').first().json.supabaseUrl }}/rest/v1/scripts?id=eq.{{ $('Workflow Configuration').first().json.scriptId }}&select=*",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "fetch-script",
-      "name": "Fetch Script Data",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [660, 0]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.heygen.com/v2/video/generate",
+        "url": "https://api.heygen.com/v2/avatars",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "X-Api-Key",
-              "value": "={{ $('Workflow Configuration').first().json.heygenApiKey }}"
+              "value": "sk_V2_hgu_kcWFcXGWWja_pBX4MbRCxxyS7DHusruaY50fcdSBq8zu"
             },
             {
-              "name": "Content-Type",
+              "name": "Accept",
               "value": "application/json"
             }
           ]
         },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"video_inputs\": [{\n    \"character\": {\n      \"type\": \"avatar\",\n      \"avatar_id\": \"{{ $('Workflow Configuration').first().json.heygenAvatarId }}\"\n    },\n    \"voice\": {\n      \"type\": \"text\",\n      \"input_text\": \"{{ $json[0].script_json.spoken_script }}\"\n    }\n  }],\n  \"dimension\": {\n    \"width\": 1080,\n    \"height\": 1920\n  }\n}",
-        "options": {}
-      },
-      "id": "create-heygen-video",
-      "name": "Create HeyGen Video",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [880, 0]
-    },
-    {
-      "parameters": {
-        "amount": 30,
-        "unit": "seconds"
-      },
-      "id": "wait-30-seconds",
-      "name": "Wait 30 Seconds",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [1100, 0]
-    },
-    {
-      "parameters": {
-        "url": "=https://api.heygen.com/v1/video_status.get?video_id={{ $('Create HeyGen Video').first().json.data.video_id }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "X-Api-Key",
-              "value": "={{ $('Workflow Configuration').first().json.heygenApiKey }}"
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
             }
-          ]
-        },
-        "options": {}
+          }
+        }
       },
-      "id": "check-heygen-status",
-      "name": "Check HeyGen Status",
+      "id": "heygen-auth-test",
+      "name": "HeyGen Auth Test",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [1320, 0]
+      "position": [440, 300],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -195,9 +118,335 @@
           },
           "conditions": [
             {
-              "id": "condition-1",
-              "leftValue": "={{ $json.data.status }}",
-              "rightValue": "completed",
+              "id": "auth-check",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-auth-success",
+      "name": "If Auth Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pass through ALL input data plus add talkingPhotoId\nreturn [{\n  json: {\n    ...$input.first().json,\n    error: false,\n    talkingPhotoId: 'd3882e6017e04a569868b81c6d60fab6'\n  }\n}];"
+      },
+      "id": "select-avatar",
+      "name": "Select Avatar by Name",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "avatar-found",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-avatar-found",
+      "name": "If Avatar Found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, 200]
+    },
+    {
+      "parameters": {
+        "url": "=https://habpialjdsyczxxkkbcj.supabase.co/rest/v1/scripts?id=eq.{{ $json.scriptId }}&select=*",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhYnBpYWxqZHN5Y3p4eGtrYmNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjAzODYzNSwiZXhwIjoyMDgxMzk4NjM1fQ.pvv_n-IEWRFF5-5KtPMk7MetVCiCLmfbFkwdFvq4Rb8"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-script",
+      "name": "Fetch Script Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1320, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare data for HeyGen video generation - NO node references\nconst scriptData = $input.first().json;\n\n// Get the script record (Supabase returns an array)\nconst script = Array.isArray(scriptData) ? scriptData[0] : scriptData;\n\nif (!script) {\n  return [{\n    json: {\n      error: true,\n      errorType: 'SCRIPT_NOT_FOUND',\n      message: 'Script not found in database',\n      scriptId: null\n    }\n  }];\n}\n\n// Extract spoken script with fallback chain\nconst spokenScript = \n  script.script_15s || \n  script.script_json?.spoken_script || \n  script.script_json?.script_15s ||\n  script.script_json?.hook ||\n  null;\n\nif (!spokenScript) {\n  return [{\n    json: {\n      error: true,\n      errorType: 'NO_SCRIPT_TEXT',\n      message: 'No spoken script found in record',\n      scriptId: script.id\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    error: false,\n    scriptId: script.id,\n    talkingPhotoId: 'd3882e6017e04a569868b81c6d60fab6',\n    spokenScript: spokenScript,\n    scriptRecord: script\n  }\n}];"
+      },
+      "id": "prepare-video-data",
+      "name": "Prepare Video Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "script-valid",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-script-valid",
+      "name": "If Script Valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1760, 100]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://habpialjdsyczxxkkbcj.supabase.co/rest/v1/scripts?id=eq.{{ $json.scriptId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhYnBpYWxqZHN5Y3p4eGtrYmNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjAzODYzNSwiZXhwIjoyMDgxMzk4NjM1fQ.pvv_n-IEWRFF5-5KtPMk7MetVCiCLmfbFkwdFvq4Rb8"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"status\": \"Script Approved\"\n}",
+        "options": {}
+      },
+      "id": "update-status-approved",
+      "name": "Update Status to Approved",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1980, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.heygen.com/v2/video/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "sk_V2_hgu_kcWFcXGWWja_pBX4MbRCxxyS7DHusruaY50fcdSBq8zu"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"video_inputs\": [{\n    \"character\": {\n      \"type\": \"talking_photo\",\n      \"talking_photo_id\": \"d3882e6017e04a569868b81c6d60fab6\"\n    },\n    \"voice\": {\n      \"type\": \"text\",\n      \"voice_id\": \"2d5b0e6cf36f460aa7fc47e3eee4ba54\",\n      \"input_text\": \"{{ ($json[0].script_15s || $json[0].script_json?.spoken_script || $json[0].script_json?.hook || '').replace(/\"/g, '\\\\\"').replace(/\\n/g, ' ') }}\"\n    }\n  }],\n  \"dimension\": {\n    \"width\": 1080,\n    \"height\": 1920\n  }\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "create-heygen-video",
+      "name": "Create HeyGen Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2200, 0],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "create-success",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            },
+            {
+              "id": "create-success-2",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 299,
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-create-success",
+      "name": "If Create Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2420, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Initialize polling state - NO node references\nconst createResponse = $input.first().json;\n\nconst videoId = createResponse.body?.data?.video_id;\n\nif (!videoId) {\n  return [{\n    json: {\n      error: true,\n      errorType: 'NO_VIDEO_ID',\n      message: 'HeyGen did not return a video_id',\n      response: createResponse\n    }\n  }];\n}\n\n// Get scriptId from the Supabase response (it was in the previous update)\nconst scriptId = createResponse.body?.[0]?.id || createResponse.scriptId;\n\nreturn [{\n  json: {\n    videoId: videoId,\n    scriptId: scriptId,\n    pollingAttempt: 0,\n    maxAttempts: 5,\n    intervalSeconds: 30,\n    status: 'pending'\n  }\n}];"
+      },
+      "id": "init-polling",
+      "name": "Init Polling State",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2640, -100]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://habpialjdsyczxxkkbcj.supabase.co/rest/v1/scripts?id=eq.{{ $json.scriptId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhYnBpYWxqZHN5Y3p4eGtrYmNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjAzODYzNSwiZXhwIjoyMDgxMzk4NjM1fQ.pvv_n-IEWRFF5-5KtPMk7MetVCiCLmfbFkwdFvq4Rb8"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"Video Generating\",\n  \"video_job_id\": \"{{ $json.videoId }}\"\n}",
+        "options": {}
+      },
+      "id": "update-status-generating",
+      "name": "Update Status Generating",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2860, -100]
+    },
+    {
+      "parameters": {
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "id": "wait-poll",
+      "name": "Wait Before Poll",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [3080, -100]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.heygen.com/v1/video_status.get?video_id={{ $json[0].video_job_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "sk_V2_hgu_kcWFcXGWWja_pBX4MbRCxxyS7DHusruaY50fcdSBq8zu"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "check-status",
+      "name": "Check HeyGen Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [3300, -100],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process polling result - NO node references\n// videoId comes from Check HeyGen Status URL param, extract from request\nconst response = $input.first().json;\n\n// Hardcoded polling config\nconst maxAttempts = 5;\n\n// Get video status from response\nconst status = response.body?.data?.status;\nconst videoUrl = response.body?.data?.video_url;\nconst videoId = response.body?.data?.video_id;\nconst errorMsg = response.body?.data?.error;\n\nif (status === 'completed' && videoUrl) {\n  return [{\n    json: {\n      action: 'SUCCESS',\n      videoUrl: videoUrl,\n      videoId: videoId,\n      status: status,\n      thumbnail: response.body?.data?.thumbnail_url || null,\n      duration: response.body?.data?.duration || null\n    }\n  }];\n}\n\nif (status === 'failed') {\n  return [{\n    json: {\n      action: 'FAIL',\n      videoId: videoId,\n      error: errorMsg || 'Video generation failed',\n      status: status\n    }\n  }];\n}\n\n// Still pending/processing - retry\nreturn [{\n  json: {\n    action: 'RETRY',\n    videoId: videoId,\n    status: status,\n    reason: `Status is ${status}, will retry...`\n  }\n}];"
+      },
+      "id": "process-poll-result",
+      "name": "Process Poll Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3520, -100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-success",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "SUCCESS",
               "operator": {
                 "type": "string",
                 "operation": "equals"
@@ -208,26 +457,171 @@
         },
         "options": {}
       },
-      "id": "if-video-complete",
-      "name": "IF Video Complete",
+      "id": "if-poll-success",
+      "name": "If Poll Success",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1540, 0]
+      "position": [3740, -100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-retry",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "RETRY",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-retry-needed",
+      "name": "If Retry Needed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [3740, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Update polling state for retry\nconst current = $input.first().json;\n\nreturn [{\n  json: {\n    videoId: current.videoId,\n    pollingAttempt: current.pollingAttempt,\n    maxAttempts: current.maxAttempts,\n    status: current.status || 'pending'\n  }\n}];"
+      },
+      "id": "update-poll-state",
+      "name": "Update Poll State",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3960, 100]
+    },
+    {
+      "parameters": {
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "id": "wait-retry",
+      "name": "Wait Retry",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [4180, 100]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.heygen.com/v1/video_status.get?video_id={{ $json.videoId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "sk_V2_hgu_kcWFcXGWWja_pBX4MbRCxxyS7DHusruaY50fcdSBq8zu"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "check-status-retry",
+      "name": "Check Status Retry",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [4400, 100],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process retry polling result - NO node references\nconst response = $input.first().json;\n\n// Get video status from response\nconst status = response.body?.data?.status;\nconst videoUrl = response.body?.data?.video_url;\nconst videoId = response.body?.data?.video_id;\nconst errorMsg = response.body?.data?.error;\n\nif (status === 'completed' && videoUrl) {\n  return [{\n    json: {\n      action: 'SUCCESS',\n      videoUrl: videoUrl,\n      videoId: videoId,\n      status: status,\n      thumbnail: response.body?.data?.thumbnail_url || null,\n      duration: response.body?.data?.duration || null\n    }\n  }];\n}\n\nif (status === 'failed') {\n  return [{\n    json: {\n      action: 'FAIL',\n      videoId: videoId,\n      error: errorMsg || 'Video generation failed',\n      status: status\n    }\n  }];\n}\n\n// Still pending - retry\nreturn [{\n  json: {\n    action: 'RETRY',\n    videoId: videoId,\n    status: status,\n    reason: `Status is ${status}, will retry...`\n  }\n}];"
+      },
+      "id": "process-retry-result",
+      "name": "Process Retry Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4620, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "retry-success",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "SUCCESS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-retry-success",
+      "name": "If Retry Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [4840, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "continue-retry",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "RETRY",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-continue-retry",
+      "name": "If Continue Retry",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [4840, 300]
     },
     {
       "parameters": {
         "method": "PATCH",
-        "url": "={{ $('Workflow Configuration').first().json.supabaseUrl }}/rest/v1/scripts?id=eq.{{ $('Workflow Configuration').first().json.scriptId }}",
+        "url": "=https://habpialjdsyczxxkkbcj.supabase.co/rest/v1/scripts?video_job_id=eq.{{ $json.videoId }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhYnBpYWxqZHN5Y3p4eGtrYmNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjAzODYzNSwiZXhwIjoyMDgxMzk4NjM1fQ.pvv_n-IEWRFF5-5KtPMk7MetVCiCLmfbFkwdFvq4Rb8"
             },
             {
               "name": "Content-Type",
@@ -241,29 +635,37 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"status\": \"Video Ready (Preview)\",\n  \"video_url\": \"{{ $('Check HeyGen Status').first().json.data.video_url }}\"\n}",
+        "jsonBody": "={\n  \"status\": \"Video Ready (Preview)\",\n  \"video_url\": \"{{ $json.videoUrl }}\",\n  \"processed\": true\n}",
         "options": {}
       },
       "id": "update-supabase-success",
       "name": "Update Supabase Success",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [1760, -100]
+      "position": [3960, -200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"script_id\": \"{{ $json[0].id }}\",\n  \"status\": \"Video Ready (Preview)\",\n  \"video_url\": \"{{ $json[0].video_url }}\"\n}",
+        "options": {}
+      },
+      "id": "respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [4180, -200]
     },
     {
       "parameters": {
         "method": "PATCH",
-        "url": "={{ $('Workflow Configuration').first().json.supabaseUrl }}/rest/v1/scripts?id=eq.{{ $('Workflow Configuration').first().json.scriptId }}",
+        "url": "=https://habpialjdsyczxxkkbcj.supabase.co/rest/v1/scripts?video_job_id=eq.{{ $json.videoId }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('Workflow Configuration').first().json.supabaseServiceKey }}"
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhYnBpYWxqZHN5Y3p4eGtrYmNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjAzODYzNSwiZXhwIjoyMDgxMzk4NjM1fQ.pvv_n-IEWRFF5-5KtPMk7MetVCiCLmfbFkwdFvq4Rb8"
             },
             {
               "name": "Content-Type",
@@ -277,31 +679,19 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"status\": \"Failed\",\n  \"error_message\": \"HeyGen video generation failed: {{ $('Check HeyGen Status').first().json.data.error || 'Unknown error' }}\"\n}",
+        "jsonBody": "={\n  \"status\": \"Video Failed\",\n  \"error_message\": \"{{ $json.error || $json.message || 'Unknown error' }}\"\n}",
         "options": {}
       },
       "id": "update-supabase-failed",
       "name": "Update Supabase Failed",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [1760, 100]
+      "position": [4400, 500]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { success: true, script_id: $('Workflow Configuration').first().json.scriptId, status: 'Video Ready (Preview)' } }}",
-        "options": {}
-      },
-      "id": "respond-success",
-      "name": "Respond Success",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [1980, -100]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ { success: false, script_id: $('Workflow Configuration').first().json.scriptId, status: 'Failed', error: $('Check HeyGen Status').first().json.data.error || 'Unknown error' } }}",
+        "responseBody": "={\n  \"success\": false,\n  \"script_id\": \"{{ $json[0].id }}\",\n  \"status\": \"Video Failed\",\n  \"error\": \"{{ $json[0].error_message || 'Unknown error' }}\"\n}",
         "options": {
           "responseCode": 500
         }
@@ -310,7 +700,139 @@
       "name": "Respond Failed",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1980, 100]
+      "position": [4620, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": false,\n  \"error\": \"HeyGen API authentication failed. Check your API key.\",\n  \"statusCode\": {{ $json.statusCode }}\n}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "respond-auth-failed",
+      "name": "Respond Auth Failed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [880, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": false,\n  \"error\": \"{{ $json.message }}\",\n  \"errorType\": \"AVATAR_NOT_FOUND\"\n}",
+        "options": {
+          "responseCode": 404
+        }
+      },
+      "id": "respond-avatar-not-found",
+      "name": "Respond Avatar Not Found",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1320, 300]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://habpialjdsyczxxkkbcj.supabase.co/rest/v1/scripts?status=eq.Script%20Approved&order=updated_at.desc&limit=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhYnBpYWxqZHN5Y3p4eGtrYmNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjAzODYzNSwiZXhwIjoyMDgxMzk4NjM1fQ.pvv_n-IEWRFF5-5KtPMk7MetVCiCLmfbFkwdFvq4Rb8"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"Video Failed\",\n  \"error_message\": \"HeyGen video creation failed: {{ $json.body?.error || $json.body?.message || 'Request failed' }}\"\n}",
+        "options": {}
+      },
+      "id": "update-create-failed",
+      "name": "Update Create Failed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2640, 100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": false,\n  \"script_id\": \"{{ $json[0].id }}\",\n  \"error\": \"HeyGen video creation failed\",\n  \"details\": \"{{ $json[0].error_message }}\"\n}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "respond-create-failed",
+      "name": "Respond Create Failed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2860, 100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": false,\n  \"script_id\": \"{{ $json.scriptId || 'unknown' }}\",\n  \"error\": \"{{ $json.message }}\",\n  \"errorType\": \"{{ $json.errorType }}\"\n}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "respond-script-invalid",
+      "name": "Respond Script Invalid",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1980, 200]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://habpialjdsyczxxkkbcj.supabase.co/rest/v1/scripts?video_job_id=eq.{{ $json.videoId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhYnBpYWxqZHN5Y3p4eGtrYmNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjAzODYzNSwiZXhwIjoyMDgxMzk4NjM1fQ.pvv_n-IEWRFF5-5KtPMk7MetVCiCLmfbFkwdFvq4Rb8"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"Video Ready (Preview)\",\n  \"video_url\": \"{{ $json.videoUrl }}\",\n  \"processed\": true\n}",
+        "options": {}
+      },
+      "id": "update-supabase-success-retry",
+      "name": "Update Success (Retry)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [5060, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"script_id\": \"{{ $json[0].id }}\",\n  \"status\": \"Video Ready (Preview)\",\n  \"video_url\": \"{{ $json[0].video_url }}\"\n}",
+        "options": {}
+      },
+      "id": "respond-success-retry",
+      "name": "Respond Success (Retry)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [5280, 0]
     }
   ],
   "connections": {
@@ -318,26 +840,89 @@
       "main": [[{"node": "Workflow Configuration", "type": "main", "index": 0}]]
     },
     "Workflow Configuration": {
-      "main": [[{"node": "Update Status to Script Approved", "type": "main", "index": 0}]]
+      "main": [[{"node": "Select Avatar by Name", "type": "main", "index": 0}]]
     },
-    "Update Status to Script Approved": {
-      "main": [[{"node": "Fetch Script Data", "type": "main", "index": 0}]]
+    "Select Avatar by Name": {
+      "main": [[{"node": "If Avatar Found", "type": "main", "index": 0}]]
+    },
+    "If Avatar Found": {
+      "main": [
+        [{"node": "Fetch Script Data", "type": "main", "index": 0}],
+        [{"node": "Respond Avatar Not Found", "type": "main", "index": 0}]
+      ]
     },
     "Fetch Script Data": {
+      "main": [[{"node": "Prepare Video Data", "type": "main", "index": 0}]]
+    },
+    "Prepare Video Data": {
+      "main": [[{"node": "If Script Valid", "type": "main", "index": 0}]]
+    },
+    "If Script Valid": {
+      "main": [
+        [{"node": "Update Status to Approved", "type": "main", "index": 0}],
+        [{"node": "Respond Script Invalid", "type": "main", "index": 0}]
+      ]
+    },
+    "Update Status to Approved": {
       "main": [[{"node": "Create HeyGen Video", "type": "main", "index": 0}]]
     },
     "Create HeyGen Video": {
-      "main": [[{"node": "Wait 30 Seconds", "type": "main", "index": 0}]]
+      "main": [[{"node": "If Create Success", "type": "main", "index": 0}]]
     },
-    "Wait 30 Seconds": {
+    "If Create Success": {
+      "main": [
+        [{"node": "Init Polling State", "type": "main", "index": 0}],
+        [{"node": "Update Create Failed", "type": "main", "index": 0}]
+      ]
+    },
+    "Init Polling State": {
+      "main": [[{"node": "Update Status Generating", "type": "main", "index": 0}]]
+    },
+    "Update Status Generating": {
+      "main": [[{"node": "Wait Before Poll", "type": "main", "index": 0}]]
+    },
+    "Wait Before Poll": {
       "main": [[{"node": "Check HeyGen Status", "type": "main", "index": 0}]]
     },
     "Check HeyGen Status": {
-      "main": [[{"node": "IF Video Complete", "type": "main", "index": 0}]]
+      "main": [[{"node": "Process Poll Result", "type": "main", "index": 0}]]
     },
-    "IF Video Complete": {
+    "Process Poll Result": {
+      "main": [[{"node": "If Poll Success", "type": "main", "index": 0}]]
+    },
+    "If Poll Success": {
       "main": [
         [{"node": "Update Supabase Success", "type": "main", "index": 0}],
+        [{"node": "If Retry Needed", "type": "main", "index": 0}]
+      ]
+    },
+    "If Retry Needed": {
+      "main": [
+        [{"node": "Update Poll State", "type": "main", "index": 0}],
+        [{"node": "Update Supabase Failed", "type": "main", "index": 0}]
+      ]
+    },
+    "Update Poll State": {
+      "main": [[{"node": "Wait Retry", "type": "main", "index": 0}]]
+    },
+    "Wait Retry": {
+      "main": [[{"node": "Check Status Retry", "type": "main", "index": 0}]]
+    },
+    "Check Status Retry": {
+      "main": [[{"node": "Process Retry Result", "type": "main", "index": 0}]]
+    },
+    "Process Retry Result": {
+      "main": [[{"node": "If Retry Success", "type": "main", "index": 0}]]
+    },
+    "If Retry Success": {
+      "main": [
+        [{"node": "Update Success (Retry)", "type": "main", "index": 0}],
+        [{"node": "If Continue Retry", "type": "main", "index": 0}]
+      ]
+    },
+    "If Continue Retry": {
+      "main": [
+        [{"node": "Update Poll State", "type": "main", "index": 0}],
         [{"node": "Update Supabase Failed", "type": "main", "index": 0}]
       ]
     },
@@ -346,16 +931,22 @@
     },
     "Update Supabase Failed": {
       "main": [[{"node": "Respond Failed", "type": "main", "index": 0}]]
+    },
+    "Update Create Failed": {
+      "main": [[{"node": "Respond Create Failed", "type": "main", "index": 0}]]
+    },
+    "Update Success (Retry)": {
+      "main": [[{"node": "Respond Success (Retry)", "type": "main", "index": 0}]]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "wf2-v1",
+  "versionId": "wf2-v3-heygen-fixed",
   "meta": {
     "instanceId": "viral-video-app"
   },
   "id": "wf2_create_video_draft",
-  "tags": ["viral-video-app", "video-generation"]
+  "tags": ["viral-video-app", "video-generation", "heygen-v2"]
 }

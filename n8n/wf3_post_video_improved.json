@@ -1,0 +1,419 @@
+{
+  "name": "WF3 - Post Video Enhanced",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "post-video",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "post-video"
+    },
+    {
+      "parameters": {
+        "code": "// Validate webhook payload and environment variables\nconst requiredVars = {\n  SUPABASE_URL: $env.SUPABASE_URL,\n  SUPABASE_SERVICE_ROLE_KEY: $env.SUPABASE_SERVICE_ROLE_KEY,\n  BLOTATO_API_KEY: $env.BLOTATO_API_KEY\n};\n\nconst missing = [];\nfor (const [key, value] of Object.entries(requiredVars)) {\n  if (!value || value.trim() === '') {\n    missing.push(key);\n  }\n}\n\nif (missing.length > 0) {\n  throw new Error(`Missing required environment variables: ${missing.join(', ')}`);\n}\n\nconst body = $input.first().json.body;\nif (!body.script_id) {\n  throw new Error('Missing required field: script_id');\n}\n\nconst platforms = body.platforms || ['tiktok', 'instagram', 'youtube'];\nif (!Array.isArray(platforms) || platforms.length === 0) {\n  throw new Error('Invalid platforms array');\n}\n\nconsole.log(`✅ Starting post for script ${body.script_id} on platforms: ${platforms.join(', ')}`);\n\nreturn [{\n  supabaseUrl: requiredVars.SUPABASE_URL,\n  supabaseServiceKey: requiredVars.SUPABASE_SERVICE_ROLE_KEY,\n  blotatoApiKey: requiredVars.BLOTATO_API_KEY,\n  scriptId: body.script_id,\n  requestedByUserId: body.requested_by_user_id || 'anonymous',\n  platforms: platforms,\n  startTime: new Date().toISOString()\n}];"
+      },
+      "id": "validate-and-config",
+      "name": "Validate & Configure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0],
+      "onError": "stopWorkflow"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.supabaseUrl }}/rest/v1/scripts?id=eq.{{ $json.scriptId }}&select=*",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $json.supabaseServiceKey }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-script",
+      "name": "Fetch Script Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [440, 0],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "leftValue": "={{ $json[0].status }}",
+              "rightValue": "Video Ready (Preview)",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "leftValue": "={{ $json[0].processed }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-valid-for-posting",
+      "name": "If Valid for Posting",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "script",
+              "value": "={{ $json[0] }}",
+              "type": "object"
+            },
+            {
+              "id": "id-2",
+              "name": "platforms",
+              "value": "={{ $('Validate & Configure').first().json.platforms }}",
+              "type": "object"
+            },
+            {
+              "id": "id-3",
+              "name": "videoUrl",
+              "value": "={{ $json[0].video_url }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "prepare-data",
+      "name": "Prepare Posting Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.videoUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "videoFile"
+            }
+          }
+        }
+      },
+      "id": "download-video",
+      "name": "Download Video File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1100, 0],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Validate & Configure').first().json.supabaseUrl }}/rest/v1/scripts?id=eq.{{ $('Validate & Configure').first().json.scriptId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('Validate & Configure').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $('Validate & Configure').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"Posting\",\n  \"posting_started_at\": \"{{ $('Validate & Configure').first().json.startTime }}\",\n  \"posted_by\": \"{{ $('Validate & Configure').first().json.requestedByUserId }}\"\n}",
+        "options": {}
+      },
+      "id": "update-status-posting",
+      "name": "Update Status to Posting",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1320, 0],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "split-platforms",
+      "name": "Split by Platform",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1540, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "platform",
+              "value": "={{ $json }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "caption",
+              "value": "={{ $('Prepare Posting Data').first().json.script.platform_captions && $('Prepare Posting Data').first().json.script.platform_captions[$json] ? $('Prepare Posting Data').first().json.script.platform_captions[$json] : ($('Prepare Posting Data').first().json.script.caption + ' ' + ($('Prepare Posting Data').first().json.script.hashtags || []).map(h => '#' + h).join(' ')) }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "scriptData",
+              "value": "={{ $('Prepare Posting Data').first().json.script }}",
+              "type": "object"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "prepare-platform-data",
+      "name": "Prepare Platform Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1760, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.blotato.com/v1/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $('Validate & Configure').first().json.blotatoApiKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"platforms\": [\"{{ $json.platform }}\"],\n  \"content\": {\n    \"text\": \"{{ $json.caption }}\",\n    \"video_url\": \"{{ $('Prepare Posting Data').first().json.videoUrl }}\"\n  },\n  \"schedule_time\": null,\n  \"metadata\": {\n    \"script_id\": \"{{ $('Validate & Configure').first().json.scriptId }}\",\n    \"source\": \"viral-video-app\"\n  }\n}",
+        "options": {}
+      },
+      "id": "post-to-blotato",
+      "name": "Post to Blotato",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1980, 0],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "platform",
+              "value": "={{ $('Prepare Platform Data').first().json.platform }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "success",
+              "value": "={{ $json.success || false }}",
+              "type": "boolean"
+            },
+            {
+              "id": "id-3",
+              "name": "postId",
+              "value": "={{ $json.post_id || null }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "error",
+              "value": "={{ $json.error || null }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "collect-platform-result",
+      "name": "Collect Platform Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2200, 0]
+    },
+    {
+      "parameters": {
+        "code": "// Collect all platform results\nconst allResults = $input.all();\nconst postIds = {};\nconst failures = [];\nlet successCount = 0;\n\nfor (const result of allResults) {\n  const platform = result.json.platform;\n  if (result.json.success && result.json.postId) {\n    postIds[platform] = result.json.postId;\n    successCount++;\n  } else {\n    failures.push({\n      platform: platform,\n      error: result.json.error || 'Unknown error'\n    });\n  }\n}\n\nconst totalPlatforms = $('Validate & Configure').first().json.platforms.length;\nconst isFullSuccess = successCount === totalPlatforms;\nconst isPartialSuccess = successCount > 0;\n\nreturn [{\n  success: isFullSuccess,\n  partial_success: isPartialSuccess && !isFullSuccess,\n  post_ids: postIds,\n  failures: failures,\n  success_count: successCount,\n  total_platforms: totalPlatforms,\n  status: isFullSuccess ? 'Posted' : (isPartialSuccess ? 'Partially Posted' : 'Failed')\n}];"
+      },
+      "id": "aggregate-results",
+      "name": "Aggregate Platform Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2420, 0]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Validate & Configure').first().json.supabaseUrl }}/rest/v1/scripts?id=eq.{{ $('Validate & Configure').first().json.scriptId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('Validate & Configure').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $('Validate & Configure').first().json.supabaseServiceKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"{{ $json.status }}\",\n  \"processed\": {{ $json.success || $json.partial_success }},\n  \"posted_at\": \"{{ new Date().toISOString() }}\",\n  \"post_ids\": {{ JSON.stringify($json.post_ids) }},\n  \"posting_errors\": {{ $json.failures.length > 0 ? JSON.stringify($json.failures) : null }}\n}",
+        "options": {}
+      },
+      "id": "update-final-status",
+      "name": "Update Final Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2640, 0],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: $('Aggregate Platform Results').first().json.success, script_id: $('Validate & Configure').first().json.scriptId, status: $('Aggregate Platform Results').first().json.status, post_ids: $('Aggregate Platform Results').first().json.post_ids, failures: $('Aggregate Platform Results').first().json.failures } }}",
+        "options": {}
+      },
+      "id": "respond-success",
+      "name": "Respond with Results",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2860, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: 'Script not ready for posting or already processed', script_id: $('Validate & Configure').first().json.scriptId } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "respond-invalid",
+      "name": "Respond Invalid",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [660, 200]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [[{"node": "Validate & Configure", "type": "main", "index": 0}]]
+    },
+    "Validate & Configure": {
+      "main": [[{"node": "Fetch Script Data", "type": "main", "index": 0}]]
+    },
+    "Fetch Script Data": {
+      "main": [[{"node": "If Valid for Posting", "type": "main", "index": 0}]]
+    },
+    "If Valid for Posting": {
+      "main": [
+        [{"node": "Prepare Posting Data", "type": "main", "index": 0}],
+        [{"node": "Respond Invalid", "type": "main", "index": 0}]
+      ]
+    },
+    "Prepare Posting Data": {
+      "main": [[{"node": "Download Video File", "type": "main", "index": 0}]]
+    },
+    "Download Video File": {
+      "main": [[{"node": "Update Status to Posting", "type": "main", "index": 0}]]
+    },
+    "Update Status to Posting": {
+      "main": [[{"node": "Split by Platform", "type": "main", "index": 0}]]
+    },
+    "Split by Platform": {
+      "main": [[{"node": "Prepare Platform Data", "type": "main", "index": 0}]]
+    },
+    "Prepare Platform Data": {
+      "main": [[{"node": "Post to Blotato", "type": "main", "index": 0}]]
+    },
+    "Post to Blotato": {
+      "main": [[{"node": "Collect Platform Result", "type": "main", "index": 0}]]
+    },
+    "Collect Platform Result": {
+      "main": [[{"node": "Aggregate Platform Results", "type": "main", "index": 0}]]
+    },
+    "Aggregate Platform Results": {
+      "main": [[{"node": "Update Final Status", "type": "main", "index": 0}]]
+    },
+    "Update Final Status": {
+      "main": [[{"node": "Respond with Results", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "wf3-v2-enhanced",
+  "meta": {
+    "instanceId": "viral-video-app"
+  },
+  "id": "wf3_post_video_manual",
+  "tags": ["viral-video-app", "posting", "multi-platform", "enhanced", "error-recovery"]
+}
